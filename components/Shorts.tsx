@@ -128,7 +128,7 @@ export default function Shorts() {
 
   return (
     <section className="w-full bg-white py-16">
-      <div className="mx-auto max-w-[1400px] px-6 lg:px-10">
+      <div className="mx-auto max-w-[1600px] px-6 lg:px-10">
         {/* heading + arrows */}
         <div className="flex items-end justify-between gap-6">
           <div>

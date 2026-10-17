@@ -603,6 +603,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode, type FormEvent } from "react";
 
+
 /* ================= ICONS ================= */
 
 function Icon({ className = "h-5 w-5", children }: { className?: string; children: ReactNode }) {
@@ -996,15 +997,54 @@ function Field({
 /* ================= PAGE ================= */
 
 export default function LoginUI({ role }: { role: Role }) {
-  const c = content[role];
   const router = useRouter();
-  const [showPassword, setShowPassword] = useState(false);
+  const c = content[role];
 
-  const handleSubmit = (e: FormEvent) => {
+  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    // Login ke baad role ke hisaab se dashboard par redirect karo
-    router.push(c.dashboardHref);
-  };
+    setError("");
+
+    // abhi sirf admin ka backend bana hai
+    if (role !== "admin") {
+      setError("Trainer login abhi tayar nahi hai.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/admin/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.message || "Login failed");
+        return;
+      }
+
+      // "Remember me" ho to localStorage (band karne par bhi rahega),
+      // warna sessionStorage (tab band hote hi chala jayega)
+      const storage = remember ? localStorage : sessionStorage;
+      storage.setItem("token", data.token);
+      storage.setItem("user", JSON.stringify(data.user));
+
+      router.push("/admin/dashboard");
+    } catch (err) {
+      console.log("Login error:", err);
+      setError("Server se connect nahi ho paya. Backend chal raha hai?");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <main className="grid min-h-screen w-full bg-[#faf7f2] lg:grid-cols-2">
@@ -1143,6 +1183,7 @@ export default function LoginUI({ role }: { role: Role }) {
           <form onSubmit={handleSubmit} className="mt-10 space-y-5">
             <Field label="Email address" icon={<MailIcon />}>
               <input
+              value={email} onChange={(e) => setEmail(e.target.value)}required autoComplete="email"
                 type="email"
                 placeholder="Enter your email"
                 className="mt-0.5 w-full bg-transparent text-sm text-neutral-800 outline-none placeholder:text-neutral-400"
@@ -1164,6 +1205,7 @@ export default function LoginUI({ role }: { role: Role }) {
               }
             >
               <input
+              value={password}onChange={(e) => setPassword(e.target.value)}required  autoComplete="current-password"
                 type={showPassword ? "text" : "password"}
                 placeholder="Enter your password"
                 className="mt-0.5 w-full bg-transparent text-sm text-neutral-800 outline-none placeholder:text-neutral-400"
@@ -1172,7 +1214,8 @@ export default function LoginUI({ role }: { role: Role }) {
 
             <div className="flex items-center justify-between text-sm">
               <label className="flex cursor-pointer items-center gap-2.5 text-neutral-700">
-                <input type="checkbox" defaultChecked className="h-[18px] w-[18px] rounded accent-[#800020]" />
+                <input type="checkbox" checked={remember}
+               onChange={(e) => setRemember(e.target.checked)} className="h-[18px] w-[18px] rounded accent-[#800020]" />
                 Remember me
               </label>
               <Link href="#" className="font-medium text-[#800020] hover:underline">
@@ -1180,13 +1223,20 @@ export default function LoginUI({ role }: { role: Role }) {
               </Link>
             </div>
 
-            <button
-              type="submit"
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#800020] py-4 text-base font-semibold text-white shadow-lg shadow-[#800020]/30 transition hover:bg-[#5e0018]"
-            >
-              <SignInIcon />
-              Sign In
-            </button>
+           {error && (
+  <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+    {error}
+  </p>
+)}
+
+     <button
+  type="submit"
+  disabled={loading}
+  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#800020] py-4 text-base font-semibold text-white shadow-lg shadow-[#800020]/30 transition hover:bg-[#5e0018] disabled:cursor-not-allowed disabled:opacity-70"
+>
+  <SignInIcon />
+  {loading ? "Signing in..." : "Sign In"}
+</button>
 
             <p className="flex items-center justify-center gap-1.5 text-xs text-neutral-600">
               <LockIcon className="h-3.5 w-3.5" />

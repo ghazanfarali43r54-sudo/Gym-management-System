@@ -8,6 +8,8 @@ import Shorts from "@/components/Shorts";
 import Calculator from "@/components/Calculator";
 import Review from "@/components/Review";
 import Link from "next/link";
+import Pricing from "@/components/Pricing";
+import Trainer from "@/components/Trainer";
 
 
 export default function Home() {
@@ -22,7 +24,9 @@ export default function Home() {
         <Hero />
         <Marquee />
         <Features />
+         <Pricing />
         <Membership />
+        <Trainer />
         <Shorts />
         <Calculator />
         <Review />
