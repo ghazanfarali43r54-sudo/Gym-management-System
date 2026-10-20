@@ -15,9 +15,11 @@ import Trainer from "@/components/Trainer";
 export default function Home() {
   return (
     <>
+    <div className="w bg-fuchsia-400 flex justify-evenly items-center ">
     <Link href="/admin/login">Admin</Link>
     <Link href="/admin/dashboard">Dashboard</Link>
     <Link href="/trainer/login">Trainer</Link>
+    </div>
      <TopBar />
       <Navbar />
       <main>

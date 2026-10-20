@@ -521,32 +521,32 @@ function AreaChart({
 function Donut({ children }: { children: ReactNode }) {
   const r = 70;
   const c = 2 * Math.PI * r;
-  let acc = 0;
+
+  // har segment ka offset pehle calculate karo (render me koi variable mutate nahi hota)
+  const segments = plans.map((s, i) => {
+    const offset = plans.slice(0, i).reduce((a, p) => a + (p.value / 100) * c, 0);
+    const len = (s.value / 100) * c;
+    return { key: s.name, color: s.color, dash: Math.max(len - 4, 0), offset };
+  });
 
   return (
     <div className="relative h-52 w-52 shrink-0">
       <svg viewBox="0 0 200 200" className="h-full w-full -rotate-90" aria-hidden>
         <circle cx="100" cy="100" r={r} fill="none" stroke="#800020" strokeOpacity="0.07" strokeWidth="24" />
-        {plans.map((s) => {
-          const len = (s.value / 100) * c;
-          const dash = Math.max(len - 4, 0);
-          const el = (
-            <circle
-              key={s.name}
-              cx="100"
-              cy="100"
-              r={r}
-              fill="none"
-              stroke={s.color}
-              strokeWidth="24"
-              strokeDasharray={`${dash} ${c - dash}`}
-              strokeDashoffset={-acc}
-              strokeLinecap="butt"
-            />
-          );
-          acc += len;
-          return el;
-        })}
+        {segments.map((seg) => (
+          <circle
+            key={seg.key}
+            cx="100"
+            cy="100"
+            r={r}
+            fill="none"
+            stroke={seg.color}
+            strokeWidth="24"
+            strokeDasharray={`${seg.dash} ${c - seg.dash}`}
+            strokeDashoffset={-seg.offset}
+            strokeLinecap="butt"
+          />
+        ))}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
         {children}
