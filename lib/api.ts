@@ -10,7 +10,7 @@ export function clearAuth() {
   }
 }
 
-export async function api(
+export async function apiFetch(
   path: string,
   options: { method?: string; body?: string } = {}
 ) {
@@ -27,11 +27,9 @@ export async function api(
 
   if (res.status === 401) {
     clearAuth();
-   // eslint-disable-next-line @next/next/no-location-assign-relative-destination
-window.location.href = "/admin/login";
-    throw new Error(data.message || "Session expire ho gaya");
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+    window.location.href = "/admin/login";
   }
-  if (!res.ok) throw new Error(data.message || "Request failed");
 
-  return data;
+  return { ok: res.ok, status: res.status, data };
 }
