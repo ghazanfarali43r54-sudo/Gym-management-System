@@ -8,6 +8,6 @@ connectDB()
 
 
 
-app.listen(3001, ()=>{
-  console.log("server running on http://localhost:3001");
+app.listen(5001, ()=>{
+  console.log("server running on http://localhost:5001");
 })

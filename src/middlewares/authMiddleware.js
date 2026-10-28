@@ -21,6 +21,10 @@ exports.protect = async (req, res, next) => {
     if (!currentUser) {
       return res.status(401).json({ message: "User no longer exists" });
     }
+        // Pending ya rejected member purane token se bhi andar nahi aa sakta
+    if (currentUser.status && currentUser.status !== "active") {
+      return res.status(401).json({ message: "Account is not active" });
+    }
 
     // Aage ke code ko user ka data mil jaye
     req.user = currentUser;

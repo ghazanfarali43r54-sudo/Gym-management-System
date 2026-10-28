@@ -54,7 +54,7 @@ function validateBusinessHours(businessHours) {
     const day = businessHours?.[dayName];
 
     if (!day) {
-      return `${dayName} ki settings missing hain.`;
+      return `${dayName}'s settings is missing `;
     }
 
     // Agar pura din closed hai to sessions validate karne ki zaroorat nahi
@@ -66,11 +66,11 @@ function validateBusinessHours(businessHours) {
     const evening = day.evening;
 
     if (!morning || !evening) {
-      return `${dayName} ke morning/evening hours missing hain.`;
+      return `${dayName} 's morning/evening hours should be missing `;
     }
 
     if (!morning.enabled && !evening.enabled) {
-      return `${dayName} open hai, is liye kam az kam ek session enable karein.`;
+      return `${dayName} opened,So enable at least one session`;
     }
 
     // Morning validation
@@ -79,14 +79,14 @@ function validateBusinessHours(businessHours) {
         !TIME_REGEX.test(morning.open) ||
         !TIME_REGEX.test(morning.close)
       ) {
-        return `${dayName} morning time invalid hai.`;
+        return `${dayName} morning time is invalid.`;
       }
 
       if (
         timeToMinutes(morning.open) >=
         timeToMinutes(morning.close)
       ) {
-        return `${dayName} morning closing time opening time ke baad hona chahiye.`;
+        return `${dayName} Morning closing time must be schduled after morning opening time`;
       }
     }
 
@@ -96,14 +96,14 @@ function validateBusinessHours(businessHours) {
         !TIME_REGEX.test(evening.open) ||
         !TIME_REGEX.test(evening.close)
       ) {
-        return `${dayName} evening time invalid hai.`;
+        return `${dayName} evening time is invalid `;
       }
 
       if (
         timeToMinutes(evening.open) >=
         timeToMinutes(evening.close)
       ) {
-        return `${dayName} evening closing time opening time ke baad hona chahiye.`;
+        return `${dayName} Morning closing time must be schduled after morning opening time`;
       }
     }
 
@@ -120,7 +120,7 @@ function validateBusinessHours(businessHours) {
         eveningStart < morningEnd;
 
       if (overlap) {
-        return `${dayName} ke morning aur evening hours overlap nahi kar sakte.`;
+        return `${dayName}'s morning & evening time should not overlap.`;
       }
     }
   }

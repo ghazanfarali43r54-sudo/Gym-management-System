@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { REQUEST_ROLES } = require("../utils/roles");
 
 // POST /api/auth/admin/login
 exports.adminLogin = async (req, res) => {
@@ -60,4 +61,62 @@ exports.getMe = (req, res) => {
       role: req.user.role,
     },
   });
+};
+
+// POST /api/auth/member/login
+exports.memberLogin = async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+
+    if (typeof email !== "string" || typeof password !== "string" || !email || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() }).select("+password");
+
+    // user na mile, ya member na ho, ya password galat ho -> same message
+    if (!user || !REQUEST_ROLES.includes(user.role)) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    // Password sahi hai, ab request ka haal dekho
+    if (user.status === "pending") {
+      return res.status(403).json({
+        status: "pending",
+        message: "Your request is still pending. The admin will contact you soon.",
+      });
+    }
+    if (user.status === "rejected") {
+      return res.status(403).json({
+        status: "rejected",
+        message: user.rejectReason
+          ? `Your request was not approved: ${user.rejectReason}`
+          : "Your request was not approved. Please contact the gym.",
+      });
+    }
+
+    const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+      expiresIn: process.env.JWT_EXPIRES_IN || "1d",
+    });
+
+    res.json({
+      message: "Login successful",
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        photo: user.photo,
+      },
+    });
+  } catch (err) {
+    console.log("Member login error:", err.message);
+    res.status(500).json({ message: "Server error" });
+  }
 };

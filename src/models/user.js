@@ -23,9 +23,26 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["admin", "trainer"],
-      default: "admin",
+      enum: ["admin", "trainer", "member"],
+      default: "member",
     },
+
+    // ---- member ki request ke liye ----
+    // pending = admin ke jawab ka intezar, active = login kar sakta hai, rejected = request radd
+    status: {
+      type: String,
+      enum: ["pending", "active", "rejected"],
+      default: "active", // admin aur trainer pehle se active hote hain
+    },
+    phone: { type: String, trim: true, default: "" },
+    branch: { type: mongoose.Schema.Types.ObjectId, ref: "Branch", default: null },
+    plan: { type: mongoose.Schema.Types.ObjectId, ref: "Plan", default: null },
+    photo: { type: String, default: "" }, // chhoti JPEG (base64 text)
+    message: { type: String, trim: true, default: "", maxlength: 300 },
+        // ---- admin ke faisle ka record ----
+    reviewedAt: { type: Date, default: null },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    rejectReason: { type: String, trim: true, default: "", maxlength: 200 },
   },
   { timestamps: true } // createdAt aur updatedAt apne aap ban jate hain
 );

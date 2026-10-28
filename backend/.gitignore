@@ -1,4 +1,0 @@
-node_modules/
-.envgit rm -r --cached node_modules
-git add .gitignore
-git commit -m "remove node_modules from git"
