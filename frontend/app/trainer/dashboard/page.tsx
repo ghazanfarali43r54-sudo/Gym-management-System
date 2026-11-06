@@ -8,9 +8,6 @@ import { useSettings } from "@/lib/SettingsContext";
 import { formatHours } from "@/lib/formatHours";
 import { getTrainer, clearTrainer } from "@/lib/memberAuth";
 
-/* =========================================================
-   TYPES
-========================================================= */
 
 type IconName =
   | "dashboard"
