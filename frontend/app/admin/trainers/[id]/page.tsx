@@ -78,6 +78,15 @@ export default function Page() {
           <div className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-800">{error}</div>
         ) : trainer ? (
           <>
+            <div className="mb-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => router.push(`/admin/trainers?view=edit&id=${encodeURIComponent(id)}`)}
+                className="rounded-xl bg-[#800020] px-4 py-2 text-sm font-semibold text-white hover:bg-[#65001a]"
+              >
+                Edit Trainer
+              </button>
+            </div>
             <header className="mb-6 rounded-2xl bg-[#800020] p-6 text-white">
               <p className="text-sm text-white/75">Trainer profile</p>
               <h1 className="mt-1 text-3xl font-bold">{display(trainer.name)}</h1>

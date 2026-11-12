@@ -720,7 +720,7 @@ export default function TrainerDashboardClient() {
   const initial = trainer.name.trim().charAt(0).toUpperCase() || "T";
 
   const accessHref = `/admin/trainers/${trainer.id}/access`;
-  const editHref = `/admin/trainers/${trainer.id}/edit`;
+  const editHref = `/admin/trainers?view=edit&id=${encodeURIComponent(trainer.id)}`;
 
   // Show every assigned member. Add one empty slot only if capacity remains.
   const memberSlots =

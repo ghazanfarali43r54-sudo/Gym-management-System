@@ -332,6 +332,16 @@ export default function MemberFitnessRecords({
   const [showForm, setShowForm] = useState(openInitialForm);
   const [editingId, setEditingId] = useState<string | null>(null);
 
+  const updateProfileUrl = (nextTab?: Tab, recordId?: string) => {
+    if (formOnly) return;
+    const params = new URLSearchParams({ member: memberId });
+    if (nextTab) {
+      params.set("fitness", nextTab === "measurements" ? "body-measurement" : "fitness-assessment");
+      if (recordId) params.set("record", recordId);
+    }
+    router.push(`/admin/members?${params.toString()}`);
+  };
+
   const [measurementForm, setMeasurementForm] =
     useState<MeasurementForm>(emptyMeasurement);
 
@@ -403,6 +413,7 @@ export default function MemberFitnessRecords({
     }
 
     setShowForm(true);
+    updateProfileUrl(tab);
   };
 
   const openMeasurementEdit = (item: Measurement) => {
@@ -411,6 +422,7 @@ export default function MemberFitnessRecords({
     setError("");
     setSuccess("");
     setShowForm(true);
+    updateProfileUrl("measurements", item._id);
   };
 
   const openAssessmentEdit = (item: Assessment) => {
@@ -419,6 +431,7 @@ export default function MemberFitnessRecords({
     setError("");
     setSuccess("");
     setShowForm(true);
+    updateProfileUrl("assessments", item._id);
   };
 
   const closeForm = () => {
@@ -430,6 +443,7 @@ export default function MemberFitnessRecords({
     setShowForm(false);
     setEditingId(null);
     setError("");
+    updateProfileUrl();
   };
 
   const updateMeasurement = (
@@ -546,6 +560,7 @@ export default function MemberFitnessRecords({
 
       setShowForm(false);
       setEditingId(null);
+      updateProfileUrl();
       setSuccess(
         editingId
           ? "Body measurement updated successfully."
@@ -672,6 +687,7 @@ export default function MemberFitnessRecords({
 
       setShowForm(false);
       setEditingId(null);
+      updateProfileUrl();
       setSuccess(
         editingId
           ? "Fitness assessment updated successfully."
@@ -733,6 +749,7 @@ export default function MemberFitnessRecords({
           onClick={() => {
             setTab("measurements");
             setShowForm(false);
+            updateProfileUrl();
             setError("");
             setSuccess("");
           }}
@@ -750,6 +767,7 @@ export default function MemberFitnessRecords({
           onClick={() => {
             setTab("assessments");
             setShowForm(false);
+            updateProfileUrl();
             setError("");
             setSuccess("");
           }}

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState, useEffect } from "react";
+import { FormEvent, Suspense, useMemo, useState, useEffect } from "react";
 import AdminShell from "@/components/admin/AdminShell";
 import { useSettings } from "@/lib/SettingsContext";
 import { apiFetch } from "@/lib/api";
@@ -9,7 +9,7 @@ import {
   isValidPersonName,
   phoneError,
 } from "@/lib/formValidation";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 /* =========================================================
    TYPES
@@ -218,10 +218,11 @@ function initials(name: string) {
    PAGE
 ========================================================= */
 
-export default function TrainersPage() {
+function TrainersPageContent() {
   const { settings } = useSettings();
 
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const openTrainerDashboard = (trainerId: string) => {
     router.push(`/admin/trainers/${trainerId}/dashboard`);
@@ -353,6 +354,7 @@ export default function TrainersPage() {
     setForm(emptyForm);
     setErrorMessage("");
     setModalOpen(true);
+    router.push("/admin/trainers?view=add");
   };
 
   /* =======================================================
@@ -375,6 +377,33 @@ export default function TrainersPage() {
 
     setErrorMessage("");
     setModalOpen(true);
+    router.push(`/admin/trainers?view=edit&id=${encodeURIComponent(trainer.id)}`);
+  };
+
+  useEffect(() => {
+    const view = searchParams.get("view");
+    if (view === "add" && !modalOpen) {
+      setEditingTrainer(null);
+      setForm(emptyForm);
+      setModalOpen(true);
+    } else if (view === "edit" && !modalOpen) {
+      const trainer = trainers.find((item) => item.id === searchParams.get("id"));
+      if (trainer) {
+        setEditingTrainer(trainer);
+        setForm({ name: trainer.name, email: trainer.email, phone: trainer.phone, specialization: trainer.specialization, experience: String(trainer.experience || ""), password: "", status: trainer.status, memberLimit: String(trainer.memberLimit ?? 20) });
+        setModalOpen(true);
+      }
+    } else if (!view && modalOpen) {
+      setModalOpen(false);
+      setEditingTrainer(null);
+    }
+  }, [searchParams, trainers, modalOpen]);
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditingTrainer(null);
+    setForm(emptyForm);
+    router.push("/admin/trainers");
   };
 
   /* =======================================================
@@ -459,6 +488,7 @@ export default function TrainersPage() {
       setModalOpen(false);
       setForm(emptyForm);
       setEditingTrainer(null);
+      router.replace("/admin/trainers");
 
       await fetchTrainers();
     } catch (error: unknown) {
@@ -1002,7 +1032,7 @@ export default function TrainersPage() {
 
               <button
                 type="button"
-                onClick={() => setModalOpen(false)}
+                onClick={closeModal}
                 className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
               >
                 Back to Trainers
@@ -1115,7 +1145,7 @@ export default function TrainersPage() {
               <div className="flex flex-col-reverse gap-3 border-t border-gray-100 pt-5 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  onClick={() => setModalOpen(false)}
+                  onClick={closeModal}
                   className="rounded-xl border border-gray-200 px-5 py-3 text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
                 >
                   Cancel
@@ -1178,5 +1208,13 @@ export default function TrainersPage() {
         </div>
       )}
     </AdminShell>
+  );
+}
+
+export default function TrainersPage() {
+  return (
+    <Suspense fallback={<div className="p-6">Loading trainers...</div>}>
+      <TrainersPageContent />
+    </Suspense>
   );
 }

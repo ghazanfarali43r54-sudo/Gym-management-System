@@ -483,6 +483,7 @@ function MembersPageContent() {
     setPhoto("");
     setError("");
     setShowModal(true);
+    router.push("/admin/members?view=add");
 
     loadTrainers();
   };
@@ -515,6 +516,7 @@ function MembersPageContent() {
 
     setError("");
     setShowModal(true);
+    router.push(`/admin/members?view=edit&member=${encodeURIComponent(member.id)}`);
 
     loadTrainers();
   };
@@ -529,7 +531,29 @@ function MembersPageContent() {
     setMembershipPlanIds([]);
     setPhoto("");
     setError("");
+    router.push(selectedMember ? `/admin/members?member=${encodeURIComponent(selectedMember.id)}` : "/admin/members?view=list");
   };
+
+  useEffect(() => {
+    const view = searchParams.get("view");
+    if (view === "add" && !showModal) {
+      setEditingMember(null);
+      setForm(emptyForm);
+      setShowModal(true);
+      loadTrainers();
+    } else if (view === "edit" && !showModal) {
+      const member = members.find((item) => item.id === searchParams.get("member"));
+      if (member) openEditModal(member);
+    } else if (view !== "add" && view !== "edit" && showModal) {
+      setShowModal(false);
+      setEditingMember(null);
+      setForm(emptyForm);
+      setTrainerId("");
+      setMembershipPlanIds([]);
+      setPhoto("");
+      setError("");
+    }
+  }, [searchParams, members, showModal]);
 
   const updateField = (field: keyof MemberForm, value: string) => {
     setForm((previous) => ({
@@ -671,6 +695,7 @@ function MembersPageContent() {
       setMembershipPlanIds([]);
       setPhoto("");
       setError("");
+      router.replace(selectedMember ? `/admin/members?member=${encodeURIComponent(selectedMember.id)}` : "/admin/members?view=list");
 
       await loadMembers();
       await loadTrainers();
