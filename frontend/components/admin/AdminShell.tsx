@@ -23,6 +23,12 @@ const paths = {
       <path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14.8c2 .7 3.5 2.3 3.5 5.2" />
     </>
   ),
+  tag: (
+    <>
+      <path d="M3 12V4h8l10 10-8 8L3 12Z" />
+      <circle cx="7.5" cy="8.5" r="1" />
+    </>
+  ),
   
   attendance: (
     <>
@@ -127,7 +133,9 @@ const nav: { group: string; items: { label: string; href: string; icon: IconName
   {
     group: "Members",
     items: [
-      { label: "Members", href: "/admin/members", icon: "members" },
+      { label: "Members", href: "/admin/members?view=list", icon: "members" },
+      { label: "Membership", href: "/admin/membership", icon: "members" },
+      { label: "Features", href: "/admin/features", icon: "tag" },
       { label: "Attendance", href: "/admin/Attendance", icon: "attendance" },
       { label: "Requests", href: "/admin/requests", icon: "members" },
     ],
@@ -234,7 +242,14 @@ if (!ok || data?.user?.role?.toLowerCase() !== "admin") {
   /* ---------- loading / error screens ---------- */
 
   if (checking) {
-    return <AdminLoading />;
+    return (
+      <>
+        <div hidden aria-hidden="true" inert>
+          {children}
+        </div>
+        <AdminLoading />
+      </>
+    );
   }
 
   if (connectError) {
@@ -310,7 +325,8 @@ if (!ok || data?.user?.role?.toLowerCase() !== "admin") {
               </p>
               <ul className="space-y-1">
                 {g.items.map((item) => {
-                  const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                  const itemPath = item.href.split("?")[0];
+                  const active = pathname === itemPath || pathname.startsWith(itemPath + "/");
                   return (
                     <li key={item.label}>
                       <Link

@@ -1,79 +1,31 @@
-import Link from "next/link";
-import { Clock, Users, Check, ArrowRight, Star, CheckCircle2 } from "lucide-react";
+"use client";
+
+import { useEffect, useState } from "react";
+import { CheckCircle2 } from "lucide-react";
+import { API_URL } from "@/lib/api";
 
 const highlights = ["Surprise pricing", "Diet plan included", "Expert guidance"];
 
-const plans = [
-  {
-    title: "Strength Training",
-    duration: "60-90 min",
-    people: "8-30 people",
-    features: [
-      "Strength training only",
-      "Free weights access",
-      "Basic diet plan",
-      "General training guidance",
-    ],
-  },
-  {
-    title: "Cardio Only",
-    duration: "45-60 min",
-    people: "10-15 people",
-    features: [
-      "Cardio equipment access",
-      "Treadmill & cycling",
-      "Basic diet plan",
-      "Cardio guidance",
-    ],
-  },
-  {
-    title: "Cardio + Strength",
-    duration: "60-90 min",
-    people: "8-45 people",
-    features: [
-      "Full gym access",
-      "Cardio & strength training",
-      "Comprehensive diet plan",
-      "Personal guidance",
-    ],
-  },
-  {
-    title: "Group Class (Strength)",
-    duration: "60 min",
-    people: "10-20 people",
-    features: [
-      "Guided strength sessions",
-      "Certified trainer",
-      "Basic diet plan",
-      "Community motivation",
-    ],
-  },
-  {
-    title: "Group Class (Cardio + Strength)",
-    duration: "60-75 min",
-    people: "10-25 people",
-    popular: true,
-    features: [
-      "Cardio & strength mix",
-      "Certified trainer",
-      "Comprehensive diet plan",
-      "Progress tracking",
-    ],
-  },
-  {
-    title: "Personal Training",
-    duration: "60 min",
-    people: "1 on 1",
-    features: [
-      "Dedicated personal trainer",
-      "Custom workout plan",
-      "Personalized diet plan",
-      "Weekly progress review",
-    ],
-  },
-];
+type Plan = {
+  _id: string;
+  name: string;
+  description?: string;
+  duration: { value: number; unit: string };
+  price: number;
+  features: { _id: string; name: string }[];
+  status: string;
+};
 
 export default function Pricing() {
+  const [plans, setPlans] = useState<Plan[]>([]);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/membership-plans`)
+      .then((response) => response.json())
+      .then((body) => setPlans((body.data ?? []).filter((plan: Plan) => plan.status === "active")))
+      .catch(() => setPlans([]));
+  }, []);
+
   return (
     <section id="pricing" className="bg-[#FAF7F2] py-20 text-[#800000]">
       <div className="mx-auto max-w-8xl px-4">
@@ -97,8 +49,25 @@ export default function Pricing() {
           </div>
         </div>
 
-        {/* Cards */}
-         
+        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {plans.map((plan) => (
+            <article key={plan._id} className="rounded-2xl border border-[#eadadd] bg-white p-6 shadow-sm">
+              <h3 className="text-xl font-bold text-black">{plan.name}</h3>
+              {plan.description && <p className="mt-2 text-sm text-gray-600">{plan.description}</p>}
+              <p className="mt-5 text-3xl font-extrabold text-[#800000]">
+                Rs. {Number(plan.price).toLocaleString("en-PK")}
+              </p>
+              <p className="mt-1 text-sm text-gray-600">for {plan.duration.value} {plan.duration.unit}{plan.duration.value > 1 ? "s" : ""}</p>
+              {plan.features?.length > 0 && (
+                <ul className="mt-5 space-y-2 text-sm text-gray-700">
+                  {plan.features.map((feature) => (
+                    <li key={feature._id} className="flex gap-2"><CheckCircle2 size={18} className="shrink-0 text-[#800000]" />{feature.name}</li>
+                  ))}
+                </ul>
+              )}
+            </article>
+          ))}
+        </div>
       </div>
     </section>
   );

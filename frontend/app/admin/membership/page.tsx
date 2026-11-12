@@ -1,781 +1,723 @@
-
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AdminShell from "@/components/admin/AdminShell";
+import { useRouter } from "next/navigation";
+
 import {
   Search,
-  Users,
-  Crown,
-  Dumbbell,
-  Star,
-  Gem,
   Plus,
-  Eye,
   Pencil,
   Trash2,
-  CalendarDays,
-  Wallet,
   X,
   Check,
-  ChevronDown,
-  UserRound,
-  SlidersHorizontal,
+  Dumbbell,
+  Users,
+  Snowflake,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
+/* ================= API CONFIG ================= */
 
-type Member = {
-  id: number;
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5001";
+
+const PLANS_URL = `${API_BASE}/api/membership-plans`;
+const FEATURES_URL = `${API_BASE}/api/features`;
+
+/* ================= TYPES ================= */
+
+type Feature = {
+  _id: string;
   name: string;
-  email: string;
-  phone: string;
-  startDate: string;
-  endDate: string;
-  status: "Active" | "Expired";
+  description?: string;
+  category?: "equipment" | "training" | "facility" | "service";
+  status?: "active" | "inactive";
 };
 
- 
+type MembershipPlan = {
+  _id: string;
+  name: string;
+  description?: string;
+  price: number;
+  duration: {
+    value: number;
+    unit: string;
+  };
+  status: "active" | "inactive";
+  features?: (string | Feature)[];
+  limits?: {
+    personalTrainingSessions?: number;
+    groupClassesPerMonth?: number;
+  };
+  freezeAllowed?: boolean;
+  maxFreezeDays?: number;
+};
 
-const initialMembers: Member[] = [
-  {
-    id: 1,
-    name: "Ahmed Khan",
-    email: "ahmed@gmail.com",
-    phone: "0301-1234567",
-    startDate: "2026-10-01",
-    endDate: "2027-04-01",
-    status: "Active",
-  },
-  {
-    id: 2,
-    name: "Sara Ahmed",
-    email: "sara@gmail.com",
-    phone: "0302-2345678",
-    startDate: "2026-09-15",
-    endDate: "2026-12-15",
-    status: "Active",
-  },
-  {
-    id: 3,
-    name: "Usman Ali",
-    email: "usman@gmail.com",
-    phone: "0303-3456789",
-    startDate: "2026-10-05",
-    endDate: "2026-11-05",
-    status: "Active",
-  },
-  {
-    id: 4,
-    name: "Ayesha Khan",
-    email: "ayesha@gmail.com",
-    phone: "0304-4567890",
-    startDate: "2026-03-01",
-    endDate: "2026-09-01",
-    status: "Expired",
-  },
-  {
-    id: 5,
-    name: "Bilal Hussain",
-    email: "bilal@gmail.com",
-    phone: "0305-5678901",
-    startDate: "2026-06-01",
-    endDate: "2027-06-01",
-    status: "Active",
-  },
-  {
-    id: 6,
-    name: "Fatima Noor",
-    email: "fatima@gmail.com",
-    phone: "0306-6789012",
-    startDate: "2026-08-20",
-    endDate: "2026-11-20",
-    status: "Active",
-  },
-  {
-    id: 7,
-    name: "Hamza Raza",
-    email: "hamza@gmail.com",
-    phone: "0307-7890123",
-    startDate: "2026-10-10",
-    endDate: "2026-11-10",
-    status: "Active",
-  },
-  {
-    id: 8,
-    name: "Zainab Ali",
-    email: "zainab@gmail.com",
-    phone: "0308-8901234",
-    startDate: "2026-07-01",
-    endDate: "2027-01-01",
-    status: "Active",
-  },
-  {
-    id: 9,
-    name: "Salman Tariq",
-    email: "salman@gmail.com",
-    phone: "0309-9012345",
-    startDate: "2026-01-01",
-    endDate: "2026-04-01",
-    status: "Expired",
-  },
-  {
-    id: 10,
-    name: "Hira Farooq",
-    email: "hira@gmail.com",
-    phone: "0310-0123456",
-    startDate: "2026-09-01",
-    endDate: "2027-09-01",
-    status: "Active",
-  },
-];
+/* ================= API HELPERS ================= */
 
-const formatDate = (date: string) =>
-  new Date(date + "T00:00:00").toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
+function authHeaders(): HeadersInit {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (typeof window !== "undefined") {
+    const token = localStorage.getItem("token");
+
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+  }
+
+  return headers;
+}
+
+async function request<T>(
+  url: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      ...authHeaders(),
+      ...(options.headers ?? {}),
+    },
+    credentials: "include",
   });
+
+  const body = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    throw new Error(
+      body?.message || body?.error || `Request failed (${res.status})`
+    );
+  }
+
+  return body as T;
+}
+
+function unwrap<T>(body: any, keys: string[]): T {
+  if (body == null) return body;
+
+  if (Array.isArray(body)) return body as T;
+
+  for (const key of keys) {
+    if (body[key] !== undefined) {
+      return body[key] as T;
+    }
+  }
+
+  return body as T;
+}
+
+/* ================= HELPERS ================= */
 
 const formatPrice = (price: number) =>
   "Rs. " + price.toLocaleString("en-PK");
 
+const formatDuration = (duration: MembershipPlan["duration"]) =>
+  `${duration.value} ${duration.unit}${
+    duration.value > 1 ? "s" : ""
+  }`;
+
+function toFeatureArray(value: unknown): (string | Feature)[] {
+  if (Array.isArray(value)) {
+    return value as (string | Feature)[];
+  }
+
+  if (value) {
+    return [value as string | Feature];
+  }
+
+  return [];
+}
+
+function featureIdOf(f: string | Feature): string {
+  return typeof f === "string" ? f : f._id;
+}
+
+/* ================= MEMBERSHIP PAGE ================= */
+
 export default function MembershipPage() {
-  const [members, setMembers] = useState(initialMembers);
-  const [selectedPlan, setSelectedPlan] = useState("All");
+  // FIX: useRouter must be inside the component
+  const router = useRouter();
+
+  const [plans, setPlans] = useState<MembershipPlan[]>([]);
+  const [allFeatures, setAllFeatures] = useState<Feature[]>([]);
+
+  const [featuresError, setFeaturesError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
   const [search, setSearch] = useState("");
-  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
-  const [editingMember, setEditingMember] = useState<Member | null>(null);
-  const [showAddPlan, setShowAddPlan] = useState(false);
-  const [newPlanName, setNewPlanName] = useState("");
-  const [newPlanPrice, setNewPlanPrice] = useState("");
-  const [newPlanDuration, setNewPlanDuration] = useState("1 Month");
 
-  const filteredMembers = useMemo(() => {
-    return members.filter((member) => {
-      const matchesPlan =
-        selectedPlan === "All" || member.plan === selectedPlan;
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "active" | "inactive"
+  >("all");
 
-      const term = search.toLowerCase();
-      const matchesSearch =
-        member.name.toLowerCase().includes(term) ||
-        member.email.toLowerCase().includes(term) ||
-        member.phone.includes(term);
+  const [deleteTarget, setDeleteTarget] =
+    useState<MembershipPlan | null>(null);
 
-      return matchesPlan && matchesSearch;
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  const sliderRef = useRef<HTMLDivElement>(null);
+
+  /* ================= SLIDER ================= */
+
+  function scrollSlider(direction: "left" | "right") {
+    sliderRef.current?.scrollBy({
+      left: direction === "left" ? -340 : 340,
+      behavior: "smooth",
     });
-  }, [members, selectedPlan, search]);
+  }
 
-  const activeCount = members.filter((m) => m.status === "Active").length;
-  const expiredCount = members.filter((m) => m.status === "Expired").length;
+  /* ================= FEATURE NAME ================= */
 
-  function deleteMember(id: number) {
-    if (window.confirm("Are you sure you want to delete this member?")) {
-      setMembers((current) => current.filter((m) => m.id !== id));
+  function featureName(f: string | Feature): string | null {
+    if (typeof f !== "string") {
+      return f.name;
+    }
+
+    return allFeatures.find((x) => x._id === f)?.name ?? null;
+  }
+
+  /* ================= LOAD FEATURES ================= */
+
+  const loadFeatures = useCallback(async () => {
+    setFeaturesError("");
+
+    try {
+      const body = await request<any>(FEATURES_URL);
+
+      const list = unwrap<Feature[]>(body, [
+        "data",
+        "features",
+      ]);
+
+      setAllFeatures(Array.isArray(list) ? list : []);
+    } catch (err) {
+      setFeaturesError(
+        err instanceof Error
+          ? err.message
+          : "Could not load features"
+      );
+    }
+  }, []);
+
+  /* ================= LOAD PLANS ================= */
+
+  const loadPlans = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
+
+    try {
+      const body = await request<any>(PLANS_URL);
+
+      const list = unwrap<MembershipPlan[]>(body, [
+        "data",
+        "plans",
+        "membershipPlans",
+      ]);
+
+      setPlans(Array.isArray(list) ? list : []);
+    } catch (err) {
+      setLoadError(
+        err instanceof Error
+          ? err.message
+          : "Could not load plans"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /* ================= INITIAL LOAD ================= */
+
+  useEffect(() => {
+    loadFeatures();
+    loadPlans();
+  }, [loadFeatures, loadPlans]);
+
+  /* ================= FILTER PLANS ================= */
+
+  const filteredPlans = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    return plans.filter((p) => {
+      const matchesStatus =
+        statusFilter === "all" || p.status === statusFilter;
+
+      const matchesSearch =
+        !term ||
+        p.name.toLowerCase().includes(term) ||
+        (p.description ?? "").toLowerCase().includes(term);
+
+      return matchesStatus && matchesSearch;
+    });
+  }, [plans, search, statusFilter]);
+
+  /* ================= SUMMARY ================= */
+
+  const activeCount = plans.filter(
+    (p) => p.status === "active"
+  ).length;
+
+  const inactiveCount = plans.length - activeCount;
+
+  /* ================= DELETE PLAN ================= */
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+
+    setDeleting(true);
+    setDeleteError("");
+
+    try {
+      await request(
+        `${PLANS_URL}/${deleteTarget._id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      setPlans((current) =>
+        current.filter((p) => p._id !== deleteTarget._id)
+      );
+
+      setDeleteTarget(null);
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error
+          ? err.message
+          : "Could not delete plan"
+      );
+    } finally {
+      setDeleting(false);
     }
   }
 
-  function saveMember() {
-    if (!editingMember) return;
-
-    setMembers((current) =>
-      current.map((m) =>
-        m.id === editingMember.id ? editingMember : m
-      )
-    );
-    setEditingMember(null);
-  }
-
-  function addPlan(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!newPlanName.trim() || Number(newPlanPrice) <= 0) return;
-
-    alert(
-      `Plan "${newPlanName}" details captured. Connect your backend to save custom plans permanently.`
-    );
-    setNewPlanName("");
-    setNewPlanPrice("");
-    setShowAddPlan(false);
-  }
+  /* ================= UI ================= */
 
   return (
-    <main className="min-h-screen bg-[#F8F5F0] p-4 text-[#352126] sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-[1600px] space-y-7">
+    <AdminShell>
+      <main className="min-h-screen bg-[#F8F5F0] p-4 text-[#352126] sm:p-6 lg:p-8">
+        <div className="mx-auto max-w-[1600px] space-y-7">
 
-        {/* Header */}
-        <header className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-sm font-medium text-[#8B6670]">
-              <span>Dashboard</span>
-              <span>/</span>
-              <span className="text-[#721D35]">Membership</span>
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight text-[#541629] sm:text-4xl">
-              Membership Management
-            </h1>
-            <p className="mt-2 text-sm text-[#866F74] sm:text-base">
-              Manage membership plans and keep track of your gym members.
-            </p>
-          </div>
+          {/* HEADER */}
 
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#EADDE0] text-[#721D35]">
-              <UserRound size={21} />
-            </div>
+          <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
-              <p className="font-semibold text-[#541629]">Admin</p>
-              <p className="text-xs text-[#8B6670]">Gym Administrator</p>
-            </div>
-          </div>
-        </header>
-
-        {/* Statistics */}
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <StatCard
-            icon={<Users size={21} />}
-            title="Total Members"
-            value={members.length}
-            detail="Registered members"
-          />
-          <StatCard
-            icon={<Check size={21} />}
-            title="Active Members"
-            value={activeCount}
-            detail="Currently active"
-          />
-          <StatCard
-            icon={<CalendarDays size={21} />}
-            title="Expired Membership"
-            value={expiredCount}
-            detail="Need renewal"
-          />
-        </section>
-
-        {/* Plans heading */}
-        <section className="space-y-5">
-          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-            <div>
-              <h2 className="text-2xl font-bold text-[#541629]">
+              <h1 className="text-3xl font-bold tracking-tight text-[#541629] sm:text-4xl">
                 Membership Plans
-              </h2>
-              <p className="mt-1 text-sm text-[#866F74]">
-                Select a plan to view its registered members.
+              </h1>
+
+              <p className="mt-2 text-sm text-[#866F74] sm:text-base">
+                Create and manage the plans your gym offers.
               </p>
             </div>
+
             <button
-              onClick={() => setShowAddPlan(true)}
+              onClick={() =>
+                router.push("/admin/membership/add")
+              }
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#721D35] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#541629]"
             >
               <Plus size={18} />
-              Add New Plan
+              Add plan
             </button>
-          </div>
+          </header>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-            {plans.map((plan) => {
-              const Icon = plan.icon;
-              const count = members.filter(
-                (m) => m.plan === plan.name
-              ).length;
-              const isSelected = selectedPlan === plan.name;
+          {/* SUMMARY */}
 
-              return (
-                <article
-                  key={plan.name}
-                  className={`relative flex flex-col rounded-2xl border bg-white p-5 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-md ${
-                    isSelected
-                      ? "border-[#721D35] ring-2 ring-[#721D35]/15"
-                      : plan.color
-                  }`}
-                >
-                  {plan.name === "Premium" && (
-                    <span className="absolute right-4 top-4 rounded-full bg-[#F3E5E9] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#721D35]">
-                      Popular
-                    </span>
-                  )}
+          <section className="grid grid-cols-3 gap-4">
+            <Summary
+              label="Total plans"
+              value={plans.length}
+            />
 
-                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#F3E5E9] text-[#721D35]">
-                    <Icon size={25} />
-                  </div>
+            <Summary
+              label="Active"
+              value={activeCount}
+            />
 
-                  <h3 className="text-xl font-bold text-[#541629]">
-                    {plan.name} Plan
-                  </h3>
-                  <p className="mt-1 text-sm text-[#947B80]">
-                    {plan.description}
-                  </p>
+            <Summary
+              label="Inactive"
+              value={inactiveCount}
+            />
+          </section>
 
-                  <div className="mt-5 flex items-baseline gap-2">
-                    <span className="text-3xl font-bold tracking-tight text-[#541629]">
-                      {formatPrice(plan.price)}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-sm text-[#947B80]">
-                    {plan.duration}
-                  </p>
+          {/* FILTERS */}
 
-                  <div className="my-5 h-px bg-[#F0E5E5]" />
+          <section className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative sm:w-[300px]">
+              <Search
+                size={18}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A18B90]"
+              />
 
-                  <ul className="flex-1 space-y-3">
-                    {plan.features.map((feature) => (
-                      <li
-                        key={feature}
-                        className="flex items-start gap-2 text-sm text-[#735C62]"
-                      >
-                        <Check
-                          size={17}
-                          className="mt-0.5 shrink-0 text-[#721D35]"
-                        />
-                        <span>{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search plans"
+                className="w-full rounded-xl border border-[#E9DDE0] bg-white py-3 pl-10 pr-4 text-sm outline-none placeholder:text-[#AD999E] focus:border-[#721D35] focus:ring-2 focus:ring-[#721D35]/10"
+              />
+            </div>
 
-                  <div className="mt-6 rounded-xl bg-[#FAF5F5] p-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-[#866F74]">
-                        Enrolled Members
-                      </span>
-                      <span className="font-bold text-[#721D35]">{count}</span>
-                    </div>
-                  </div>
-
+            <div className="inline-flex rounded-xl border border-[#E9DDE0] bg-white p-1">
+              {(["all", "active", "inactive"] as const).map(
+                (s) => (
                   <button
-                    onClick={() =>
-                      setSelectedPlan(isSelected ? "All" : plan.name)
-                    }
-                    className={`mt-4 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${
-                      isSelected
-                        ? "border border-[#721D35] bg-white text-[#721D35]"
-                        : "bg-[#721D35] text-white hover:bg-[#541629]"
+                    key={s}
+                    onClick={() => setStatusFilter(s)}
+                    className={`rounded-lg px-4 py-2 text-sm font-semibold capitalize transition ${
+                      statusFilter === s
+                        ? "bg-[#721D35] text-white"
+                        : "text-[#866F74] hover:bg-[#F3E5E9]"
                     }`}
                   >
-                    {isSelected ? "Clear Plan Filter" : "View Members"}
+                    {s}
                   </button>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Members Table */}
-        <section className="overflow-hidden rounded-2xl border border-[#E9DDE0] bg-white shadow-sm">
-          <div className="border-b border-[#F0E5E5] p-5 sm:p-6">
-            <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-center">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#F3E5E9] text-[#721D35]">
-                  <Users size={24} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-[#541629]">
-                    Registered Members
-                  </h2>
-                  <p className="mt-1 text-sm text-[#947B80]">
-                    {selectedPlan === "All"
-                      ? "All members and their selected plans"
-                      : `${selectedPlan} plan members`}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <div className="relative min-w-0 sm:min-w-[240px]">
-                  <Search
-                    size={18}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-[#A18B90]"
-                  />
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search members..."
-                    className="w-full rounded-xl border border-[#E9DDE0] bg-[#FDFBFA] py-3 pl-10 pr-4 text-sm outline-none transition placeholder:text-[#AD999E] focus:border-[#721D35] focus:ring-2 focus:ring-[#721D35]/10"
-                  />
-                </div>
-
-                <div className="relative">
-                  <SlidersHorizontal
-                    size={16}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#721D35]"
-                  />
-                  <select
-                    value={selectedPlan}
-                    onChange={(e) => setSelectedPlan(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-[#E9DDE0] bg-[#FDFBFA] py-3 pl-9 pr-9 text-sm font-medium outline-none focus:border-[#721D35] sm:min-w-[160px]"
-                  >
-                    <option value="All">All Plans</option>
-                    {plans.map((p) => (
-                      <option key={p.name} value={p.name}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    size={16}
-                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#947B80]"
-                  />
-                </div>
-              </div>
+                )
+              )}
             </div>
-          </div>
+          </section>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-left text-sm">
-              <thead>
-                <tr className="bg-[#FAF5F5] text-xs uppercase tracking-wider text-[#896C74]">
-                  <th className="px-5 py-4 font-semibold">Member</th>
-                  <th className="px-5 py-4 font-semibold">Contact</th>
-                  <th className="px-5 py-4 font-semibold">Plan</th>
-                  <th className="px-5 py-4 font-semibold">Start Date</th>
-                  <th className="px-5 py-4 font-semibold">End Date</th>
-                  <th className="px-5 py-4 font-semibold">Status</th>
-                  <th className="px-5 py-4 text-center font-semibold">Actions</th>
-                </tr>
-              </thead>
+          {/* CONTENT */}
 
-              <tbody className="divide-y divide-[#F1E8E9]">
-                {filteredMembers.map((member) => (
-                  <tr
-                    key={member.id}
-                    className="transition hover:bg-[#FDF9F8]"
-                  >
-                    <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#F0E0E5] font-bold text-[#721D35]">
-                          {member.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")
-                            .slice(0, 2)}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-[#541629]">
-                            {member.name}
-                          </p>
-                          <p className="mt-1 text-xs text-[#A18B90]">
-                            ID: MEM-{String(member.id).padStart(4, "0")}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
+          {loading ? (
+            <div className="flex items-center justify-center gap-3 rounded-2xl border border-[#E9DDE0] bg-white py-20 text-[#866F74]">
+              <Loader2
+                className="animate-spin"
+                size={20}
+              />
+              Loading plans
+            </div>
+          ) : loadError ? (
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-red-100 bg-white py-16 text-center">
+              <AlertCircle
+                className="text-red-500"
+                size={32}
+              />
 
-                    <td className="px-5 py-4">
-                      <p className="text-[#634A51]">{member.email}</p>
-                      <p className="mt-1 text-xs text-[#A18B90]">
-                        {member.phone}
-                      </p>
-                    </td>
+              <p className="font-semibold text-[#541629]">
+                Plans could not be loaded
+              </p>
 
-                    <td className="px-5 py-4">
-                      <span
-                        className={`inline-flex rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                          member.plan === "VIP"
-                            ? "bg-amber-100 text-amber-800"
-                            : member.plan === "Premium"
-                              ? "bg-[#721D35] text-white"
-                              : member.plan === "Standard"
-                                ? "bg-rose-100 text-[#721D35]"
-                                : "bg-stone-100 text-stone-700"
-                        }`}
-                      >
-                        {member.plan}
-                      </span>
-                    </td>
+              <p className="max-w-md text-sm text-[#866F74]">
+                {loadError}
+              </p>
 
-                    <td className="whitespace-nowrap px-5 py-4 text-[#735C62]">
-                      {formatDate(member.startDate)}
-                    </td>
-                    <td className="whitespace-nowrap px-5 py-4 text-[#735C62]">
-                      {formatDate(member.endDate)}
-                    </td>
+              <button
+                onClick={loadPlans}
+                className="mt-2 inline-flex items-center gap-2 rounded-xl bg-[#721D35] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#541629]"
+              >
+                <RefreshCw size={16} />
+                Try again
+              </button>
+            </div>
+          ) : filteredPlans.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-[#E9DDE0] bg-white py-16 text-center">
+              <p className="font-semibold text-[#541629]">
+                {plans.length === 0
+                  ? "No plans yet"
+                  : "No plans match your search"}
+              </p>
 
-                    <td className="px-5 py-4">
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
-                          member.status === "Active"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-red-50 text-red-700"
-                        }`}
-                      >
+              <p className="text-sm text-[#947B80]">
+                {plans.length === 0
+                  ? "Add your first membership plan to get started."
+                  : "Try a different search or status filter."}
+              </p>
+
+              {plans.length === 0 && (
+                <button
+                  onClick={() =>
+                    router.push("/admin/membership/add")
+                  }
+                  className="mt-2 inline-flex items-center gap-2 rounded-xl bg-[#721D35] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#541629]"
+                >
+                  <Plus size={16} />
+                  Add plan
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="relative">
+
+              {/* LEFT SCROLL */}
+
+              <button
+                onClick={() => scrollSlider("left")}
+                aria-label="Scroll plans left"
+                className="absolute -left-3 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[#E9DDE0] bg-white text-[#721D35] shadow-md transition hover:bg-[#F3E5E9] md:flex"
+              >
+                <ChevronLeft size={22} />
+              </button>
+
+              {/* RIGHT SCROLL */}
+
+              <button
+                onClick={() => scrollSlider("right")}
+                aria-label="Scroll plans right"
+                className="absolute -right-3 top-1/2 z-10 hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-[#E9DDE0] bg-white text-[#721D35] shadow-md transition hover:bg-[#F3E5E9] md:flex"
+              >
+                <ChevronRight size={22} />
+              </button>
+
+              {/* PLAN SLIDER */}
+
+              <div
+                ref={sliderRef}
+                className="flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth px-1 pb-4 pt-1"
+              >
+                {filteredPlans.map((plan) => {
+                  const planFeatures = toFeatureArray(
+                    plan.features
+                  )
+                    .map((f) => ({
+                      id: featureIdOf(f),
+                      name: featureName(f),
+                    }))
+                    .filter(
+                      (
+                        f
+                      ): f is {
+                        id: string;
+                        name: string;
+                      } => !!f.name
+                    );
+
+                  return (
+                    <article
+                      key={plan._id}
+                      className={`flex w-[300px] shrink-0 snap-start flex-col rounded-2xl border border-[#E9DDE0] bg-white p-5 shadow-sm sm:w-[320px] ${
+                        plan.status === "inactive"
+                          ? "opacity-75"
+                          : ""
+                      }`}
+                    >
+
+                      {/* PLAN HEADER */}
+
+                      <div className="flex items-start justify-between gap-3">
+                        <h3 className="text-xl font-bold text-[#541629]">
+                          {plan.name}
+                        </h3>
+
                         <span
-                          className={`h-1.5 w-1.5 rounded-full ${
-                            member.status === "Active"
-                              ? "bg-emerald-500"
-                              : "bg-red-500"
+                          className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold capitalize ${
+                            plan.status === "active"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : "bg-stone-100 text-stone-600"
                           }`}
-                        />
-                        {member.status}
-                      </span>
-                    </td>
+                        >
+                          {plan.status}
+                        </span>
+                      </div>
 
-                    <td className="px-5 py-4">
-                      <div className="flex items-center justify-center gap-2">
+                      {/* DESCRIPTION */}
+
+                      {plan.description && (
+                        <p className="mt-1 text-sm text-[#947B80]">
+                          {plan.description}
+                        </p>
+                      )}
+
+                      {/* PRICE */}
+
+                      <p className="mt-5 text-3xl font-bold tracking-tight text-[#541629]">
+                        {formatPrice(plan.price)}
+                      </p>
+
+                      <p className="mt-1 text-sm text-[#947B80]">
+                        for {formatDuration(plan.duration)}
+                      </p>
+
+                      <div className="my-5 h-px bg-[#F0E5E5]" />
+
+                      {/* FEATURES */}
+
+                      <ul className="flex-1 space-y-3">
+                        {planFeatures.map((feature) => (
+                          <li
+                            key={feature.id}
+                            className="flex items-start gap-2 text-sm text-[#735C62]"
+                          >
+                            <Check
+                              size={17}
+                              className="mt-0.5 shrink-0 text-[#721D35]"
+                            />
+
+                            <span>{feature.name}</span>
+                          </li>
+                        ))}
+
+                        {/* PERSONAL TRAINING */}
+
+                        <li className="flex items-start gap-2 text-sm text-[#735C62]">
+                          <Dumbbell
+                            size={17}
+                            className="mt-0.5 shrink-0 text-[#721D35]"
+                          />
+
+                          <span>
+                            {plan.limits
+                              ?.personalTrainingSessions ?? 0}{" "}
+                            personal training sessions
+                          </span>
+                        </li>
+
+                        {/* GROUP CLASSES */}
+
+                        <li className="flex items-start gap-2 text-sm text-[#735C62]">
+                          <Users
+                            size={17}
+                            className="mt-0.5 shrink-0 text-[#721D35]"
+                          />
+
+                          <span>
+                            {plan.limits?.groupClassesPerMonth ??
+                              0}{" "}
+                            group classes per month
+                          </span>
+                        </li>
+
+                        {/* FREEZE */}
+
+                        <li className="flex items-start gap-2 text-sm text-[#735C62]">
+                          <Snowflake
+                            size={17}
+                            className="mt-0.5 shrink-0 text-[#721D35]"
+                          />
+
+                          <span>
+                            {plan.freezeAllowed
+                              ? `Freeze allowed, up to ${plan.maxFreezeDays} days`
+                              : "Freeze not allowed"}
+                          </span>
+                        </li>
+                      </ul>
+
+                      {/* ACTIONS */}
+
+                      <div className="mt-6 flex gap-2">
                         <button
-                          title="View member"
-                          onClick={() => setSelectedMember(member)}
-                          className="rounded-lg border border-[#E9DDE0] p-2 text-[#721D35] transition hover:bg-[#F3E5E9]"
+                          onClick={() =>
+                            router.push(
+                              `/admin/membership/edit/${plan._id}`
+                            )
+                          }
+                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#721D35] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#541629]"
                         >
-                          <Eye size={16} />
+                          <Pencil size={15} />
+                          Edit
                         </button>
+
                         <button
-                          title="Edit member"
-                          onClick={() => setEditingMember({ ...member })}
-                          className="rounded-lg border border-[#E9DDE0] p-2 text-[#721D35] transition hover:bg-[#F3E5E9]"
-                        >
-                          <Pencil size={16} />
-                        </button>
-                        <button
-                          title="Delete member"
-                          onClick={() => deleteMember(member.id)}
-                          className="rounded-lg border border-red-100 p-2 text-red-600 transition hover:bg-red-50"
+                          title="Delete plan"
+                          aria-label={`Delete ${plan.name}`}
+                          onClick={() => {
+                            setDeleteError("");
+                            setDeleteTarget(plan);
+                          }}
+                          className="rounded-xl border border-red-100 px-3 text-red-600 transition hover:bg-red-50"
                         >
                           <Trash2 size={16} />
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-
-                {filteredMembers.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-16 text-center">
-                      <Users
-                        size={35}
-                        className="mx-auto mb-3 text-[#C7AFB5]"
-                      />
-                      <p className="font-semibold text-[#541629]">
-                        No members found
-                      </p>
-                      <p className="mt-1 text-sm text-[#947B80]">
-                        Try another search or select a different plan.
-                      </p>
-                      <button
-                        onClick={() => {
-                          setSearch("");
-                          setSelectedPlan("All");
-                        }}
-                        className="mt-4 text-sm font-semibold text-[#721D35] underline"
-                      >
-                        Clear filters
-                      </button>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex flex-col justify-between gap-3 border-t border-[#F0E5E5] bg-[#FDFBFA] px-5 py-4 sm:flex-row sm:items-center">
-            <p className="text-sm text-[#947B80]">
-              Showing <span className="font-semibold text-[#541629]">{filteredMembers.length}</span> of{" "}
-              <span className="font-semibold text-[#541629]">{members.length}</span> members
-            </p>
-            <button
-              onClick={() => {
-                setSelectedPlan("All");
-                setSearch("");
-              }}
-              className="text-sm font-semibold text-[#721D35] hover:underline"
-            >
-              Reset filters
-            </button>
-          </div>
-        </section>
-
-        <footer className="pb-3 text-center text-xs text-[#A18B90]">
-          Gym Management System · Membership Administration
-        </footer>
-      </div>
-
-      {/* View Member Modal */}
-      {selectedMember && (
-        <Modal title="Member Details" onClose={() => setSelectedMember(null)}>
-          <div className="mb-5 flex items-center gap-4 rounded-xl bg-[#FAF5F5] p-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#721D35] text-lg font-bold text-white">
-              {selectedMember.name
-                .split(" ")
-                .map((n) => n[0])
-                .join("")
-                .slice(0, 2)}
+                    </article>
+                  );
+                })}
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg font-bold text-[#541629]">
-                {selectedMember.name}
-              </h3>
-              <p className="text-sm text-[#947B80]">
-                MEM-{String(selectedMember.id).padStart(4, "0")}
-              </p>
-            </div>
-          </div>
-          <div className="space-y-4 text-sm">
-            <Detail label="Email" value={selectedMember.email} />
-            <Detail label="Phone" value={selectedMember.phone} />
-            <Detail label="Membership Plan" value={selectedMember.plan} />
-            <Detail label="Start Date" value={formatDate(selectedMember.startDate)} />
-            <Detail label="End Date" value={formatDate(selectedMember.endDate)} />
-            <Detail label="Status" value={selectedMember.status} />
-          </div>
-        </Modal>
-      )}
+          )}
+        </div>
 
-      {/* Edit Member Modal */}
-      {editingMember && (
-        <Modal title="Edit Member" onClose={() => setEditingMember(null)}>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              saveMember();
-            }}
-            className="space-y-4"
+        {/* DELETE CONFIRMATION */}
+
+        {deleteTarget && (
+          <Modal
+            title="Delete plan"
+            onClose={() =>
+              !deleting && setDeleteTarget(null)
+            }
           >
-            <Field label="Full Name">
-              <input
-                required
-                value={editingMember.name}
-                onChange={(e) =>
-                  setEditingMember({ ...editingMember, name: e.target.value })
-                }
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Email">
-              <input
-                type="email"
-                required
-                value={editingMember.email}
-                onChange={(e) =>
-                  setEditingMember({ ...editingMember, email: e.target.value })
-                }
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Phone">
-              <input
-                required
-                value={editingMember.phone}
-                onChange={(e) =>
-                  setEditingMember({ ...editingMember, phone: e.target.value })
-                }
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Membership Plan">
-              <select
-                value={editingMember.plan}
-                onChange={(e) =>
-                  setEditingMember({
-                    ...editingMember,
-                    plan: e.target.value as PlanName,
-                  })
-                }
-                className={inputClass}
-              >
-                {plans.map((p) => (
-                  <option key={p.name} value={p.name}>{p.name}</option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Status">
-              <select
-                value={editingMember.status}
-                onChange={(e) =>
-                  setEditingMember({
-                    ...editingMember,
-                    status: e.target.value as Member["status"],
-                  })
-                }
-                className={inputClass}
-              >
-                <option value="Active">Active</option>
-                <option value="Expired">Expired</option>
-              </select>
-            </Field>
-            <button
-              type="submit"
-              className="w-full rounded-xl bg-[#721D35] px-4 py-3 font-semibold text-white hover:bg-[#541629]"
-            >
-              Save Changes
-            </button>
-          </form>
-        </Modal>
-      )}
-
-      {/* Add Plan Modal */}
-      {showAddPlan && (
-        <Modal title="Add New Plan" onClose={() => setShowAddPlan(false)}>
-          <form onSubmit={addPlan} className="space-y-4">
-            <Field label="Plan Name">
-              <input
-                required
-                value={newPlanName}
-                onChange={(e) => setNewPlanName(e.target.value)}
-                placeholder="e.g. Student Plan"
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Price (PKR)">
-              <input
-                required
-                type="number"
-                min="1"
-                value={newPlanPrice}
-                onChange={(e) => setNewPlanPrice(e.target.value)}
-                placeholder="5000"
-                className={inputClass}
-              />
-            </Field>
-            <Field label="Duration">
-              <select
-                value={newPlanDuration}
-                onChange={(e) => setNewPlanDuration(e.target.value)}
-                className={inputClass}
-              >
-                <option>1 Month</option>
-                <option>3 Months</option>
-                <option>6 Months</option>
-                <option>12 Months</option>
-              </select>
-            </Field>
-            <button
-              type="submit"
-              className="w-full rounded-xl bg-[#721D35] px-4 py-3 font-semibold text-white hover:bg-[#541629]"
-            >
-              Save Plan Details
-            </button>
-            <p className="text-xs text-[#947B80]">
-              Permanent plan creation requires backend integration.
+            <p className="text-sm text-[#735C62]">
+              Delete{" "}
+              <span className="font-semibold text-[#541629]">
+                {deleteTarget.name}
+              </span>
+              ? This cannot be undone.
             </p>
-          </form>
-        </Modal>
-      )}
-    </main>
+
+            {deleteError && (
+              <p className="mt-4 flex items-start gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
+                <AlertCircle
+                  size={16}
+                  className="mt-0.5 shrink-0"
+                />
+                {deleteError}
+              </p>
+            )}
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="flex-1 rounded-xl border border-[#E9DDE0] px-4 py-3 text-sm font-semibold text-[#721D35] hover:bg-[#F3E5E9] disabled:opacity-60"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {deleting && (
+                  <Loader2
+                    size={16}
+                    className="animate-spin"
+                  />
+                )}
+                Delete plan
+              </button>
+            </div>
+          </Modal>
+        )}
+      </main>
+    </AdminShell>
   );
 }
 
-const inputClass =
-  "w-full rounded-xl border border-[#E9DDE0] bg-white px-4 py-3 text-sm text-[#541629] outline-none focus:border-[#721D35] focus:ring-2 focus:ring-[#721D35]/10";
+/* ================= SUMMARY COMPONENT ================= */
 
-function StatCard({
-  icon,
-  title,
+function Summary({
+  label,
   value,
-  detail,
 }: {
-  icon: React.ReactNode;
-  title: string;
+  label: string;
   value: number;
-  detail: string;
 }) {
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-[#E9DDE0] bg-white p-5 shadow-sm">
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#F3E5E9] text-[#721D35]">
-        {icon}
-      </div>
-      <div>
-        <p className="text-sm text-[#947B80]">{title}</p>
-        <p className="mt-1 text-2xl font-bold text-[#541629]">{value}</p>
-        <p className="mt-1 text-xs text-[#A18B90]">{detail}</p>
-      </div>
+    <div className="rounded-2xl border border-[#E9DDE0] bg-white p-5 shadow-sm">
+      <p className="text-sm text-[#947B80]">
+        {label}
+      </p>
+
+      <p className="mt-1 text-2xl font-bold text-[#541629]">
+        {value}
+      </p>
     </div>
   );
 }
+
+/* ================= MODAL COMPONENT ================= */
 
 function Modal({
   title,
@@ -790,12 +732,18 @@ function Modal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-[#291018]/50 p-4 backdrop-blur-sm"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
       }}
     >
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-[#E9DDE0] bg-[#FDFBFA] p-6 shadow-2xl">
+
         <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-[#541629]">{title}</h2>
+          <h2 className="text-xl font-bold text-[#541629]">
+            {title}
+          </h2>
+
           <button
             onClick={onClose}
             aria-label="Close dialog"
@@ -804,32 +752,9 @@ function Modal({
             <X size={20} />
           </button>
         </div>
+
         {children}
       </div>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block space-y-2">
-      <span className="text-sm font-semibold text-[#634A51]">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4 border-b border-[#F0E5E5] pb-3">
-      <span className="text-[#947B80]">{label}</span>
-      <span className="text-right font-semibold text-[#541629]">{value}</span>
     </div>
   );
 }

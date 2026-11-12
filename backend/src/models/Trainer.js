@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-// const commonSchema = require("./userMetaData");
+
 
 const trainerSchema = new mongoose.Schema({
   trainerId: {
@@ -43,8 +43,7 @@ const trainerSchema = new mongoose.Schema({
   timestamps:true
 });
 
-// Add common fields
-// trainerSchema.add(commonSchema.obj);
+
 
 
 

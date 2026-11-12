@@ -30,7 +30,7 @@ async function getOrCreateSettings() {
     return await Settings.findOneAndUpdate(
       { key: "main" },
       { $setOnInsert: { key: "main" } }, // sirf tab banta hai jab pehle se na ho
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
   } catch (err) {
     // doosri request ne abhi abhi bana diya: bas wohi utha lo

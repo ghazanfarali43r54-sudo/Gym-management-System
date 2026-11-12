@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const User = require("../models/user");
+const {User} = require("../models/user");
 
 // Guard 1: kya banda logged-in hai? (token sahi hai?)
 exports.protect = async (req, res, next) => {
@@ -13,7 +13,6 @@ exports.protect = async (req, res, next) => {
     }
 
     const token = header.split(" ")[1];
-
     // Token asli hai aur expire nahi hua? Warna yahan error aayega
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
@@ -30,7 +29,9 @@ exports.protect = async (req, res, next) => {
     // Aage ke code ko user ka data mil jaye
     req.user = currentUser;
     next();
+    
   } catch (err) {
+    console.log("jwt auth error")
     res.status(401).json({ message: "Invalid or expired token" });
   }
 };

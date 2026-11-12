@@ -36,16 +36,16 @@ const features = [
 
 export default function Features() {
   return (
-    <section className="w-full bg-white py-16 sm:py-20 lg:py-24 ">
+    <section className="w-full bg-[#faf7f2] py-16 sm:py-20 lg:py-24">
       <div className="mx-auto max-w-8xl px-4 sm:px-6 lg:px-8">
 
         {/* Heading */}
         <div className="mx-auto mb-12 max-w-3xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
+          <h2 className="text-3xl font-bold tracking-tight text-[#800020] sm:text-4xl">
             Why Choose StayFit?
           </h2>
 
-          <p className="mt-4 text-base leading-7 text-slate-600 sm:text-lg">
+          <p className="mt-4 text-base leading-7 text-[#55464a] sm:text-lg">
             We provide comprehensive fitness solutions with expert guidance,
             modern equipment, and personalized programs to help you achieve
             your goals.
@@ -63,13 +63,13 @@ export default function Features() {
                 className="
                   group
                   flex min-h-[270px] cursor-pointer flex-col items-center
-                  justify-center rounded-2xl border border-slate-200
-                  bg-white px-6 py-8 text-center
+                  justify-center rounded-2xl border border-[#eadfdc]
+                  bg-[#fffdf9] px-6 py-8 text-center
                   shadow-[0_4px_14px_rgba(0,0,0,0.06)]
                   transition-all duration-300 ease-out
                   hover:-translate-y-2
                   hover:scale-105
-                  hover:border-red-200
+                  hover:border-[#800020]/40
                   hover:shadow-[0_18px_40px_rgba(0,0,0,0.14)]
                 "
               >
@@ -78,7 +78,7 @@ export default function Features() {
                   className="
                     mb-8 flex h-14 w-14 items-center justify-center
                     rounded-full transition-all duration-300
-                    group-hover:bg-red-50
+                    group-hover:bg-[#800020]/10
                     group-hover:scale-110
                   "
                 >
@@ -86,7 +86,7 @@ export default function Features() {
                     size={31}
                     strokeWidth={2}
                     className="
-                      text-slate-950
+                      text-[#800020]
                       transition-colors duration-300
                       group-hover:text-[#800020]
                     "
@@ -96,7 +96,7 @@ export default function Features() {
                 {/* Title */}
                 <h3
                   className="
-                    text-lg font-bold text-slate-950
+                    text-lg font-bold text-[#4a1525]
                     transition-colors duration-300
                     group-hover:text-[#800020]
                   "
@@ -105,7 +105,7 @@ export default function Features() {
                 </h3>
 
                 {/* Description */}
-                <p className="mt-4 text-sm leading-6 text-slate-600">
+                <p className="mt-4 text-sm leading-6 text-[#55464a]">
                   {feature.description}
                 </p>
               </div>

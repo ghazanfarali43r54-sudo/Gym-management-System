@@ -1,16 +1,13 @@
 const mongoose = require("mongoose");
 
-function connectDB(){
+async function connectDB() {
+  const mongoUrl = process.env.MONGO_URL;
+  if (!mongoUrl) {
+    throw new Error("MONGO_URL is not set. Add it to backend/.env before starting the API.");
+  }
 
-  mongoose.connect(process.env.MONGO_URL)
-  .then(()=>{
-    console.log("Connected to DB")
-    
-  })
-  .catch( err => {
-    console.log("DB Connection Error:", err.message)
-    process.exit(1)
-  })
+  await mongoose.connect(mongoUrl);
+  console.log("Connected to DB");
 }
 
 module.exports = connectDB;

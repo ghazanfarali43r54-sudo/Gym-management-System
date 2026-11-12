@@ -17,12 +17,23 @@ type FormState = {
   phone: string;
   password: string;
   confirm: string;
+  gender: string;
+  dateOfBirth: string;
+  street: string;
+  city: string;
+  country: string;
+  emergencyName: string;
+  emergencyRelationship: string;
+  emergencyPhone: string;
 
   experience: string;
   specialization: string;
   bio: string;
   message: string;
+  membershipPlanIds: string[];
 };
+
+type MembershipPlan = { _id: string; name: string; price: number; description?: string };
 
 const emptyForm: FormState = {
   role: "member",
@@ -31,10 +42,19 @@ const emptyForm: FormState = {
   phone: "",
   password: "",
   confirm: "",
+  gender: "",
+  dateOfBirth: "",
+  street: "",
+  city: "",
+  country: "",
+  emergencyName: "",
+  emergencyRelationship: "",
+  emergencyPhone: "",
 
   experience: "",
   specialization: "",
   message: "",
+  membershipPlanIds: [],
   bio: "",
 };
 
@@ -65,6 +85,8 @@ function validate(form: FormState) {
 
   if (form.password.length < 6) {
     errors.password = "Password must be at least 6 characters long";
+  } else if (form.password.length > 72) {
+    errors.password = "Password must be 72 characters or fewer";
   }
 
   if (form.confirm !== form.password) {
@@ -153,6 +175,12 @@ export default function RegisterModal({
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [today, setToday] = useState("");
+  const [membershipPlans, setMembershipPlans] = useState<MembershipPlan[]>([]);
+
+  useEffect(() => {
+    setToday(new Date().toISOString().slice(0, 10));
+  }, []);
 
   const errors = validate(form);
 
@@ -182,11 +210,13 @@ export default function RegisterModal({
       try {
         setLoadingLists(true);
         setListError("");
-
-        if (controller.signal.aborted) return;
+        const response = await fetch(`${API_URL}/api/public/membership-plans`, { signal: controller.signal });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.message || "Could not load membership plans.");
+        setMembershipPlans(Array.isArray(body.data) ? body.data : []);
       } catch (error) {
         if (controller.signal.aborted) return;
-
+        setListError(error instanceof Error ? error.message : "Could not load membership plans.");
         console.error(error);
       } finally {
         if (!controller.signal.aborted) {
@@ -288,6 +318,13 @@ export default function RegisterModal({
 
           message: form.message.trim(),
           photo,
+          membershipPlanIds: form.role === "member" ? form.membershipPlanIds : [],
+          ...(form.role === "member" ? {
+            gender: form.gender,
+            dateOfBirth: form.dateOfBirth || null,
+            address: { street: form.street.trim(), city: form.city.trim(), country: form.country.trim() },
+            emergencyContact: { name: form.emergencyName.trim(), relationship: form.emergencyRelationship.trim(), phone: form.emergencyPhone.trim() },
+          } : {}),
         }),
       });
 
@@ -478,41 +515,22 @@ export default function RegisterModal({
 
               <div className="grid w-full grid-cols-1 gap-5 sm:grid-cols-2">
                 <Field label="Full Name" required error={err("name")}>
-                  <input
-                    className={inputCls}
-                    placeholder="Enter your full name"
-                    autoComplete="name"
-                    value={form.name}
-                    onChange={(e) => set("name", e.target.value)}
-                  />
+                  <input className={inputCls} placeholder="Enter your full name" autoComplete="name" value={form.name} onChange={(e) => set("name", e.target.value)} />
                 </Field>
 
                 <Field label="Phone Number" required error={err("phone")}>
-                  <input
-                    className={inputCls}
-                    placeholder="03001234567"
-                    autoComplete="tel"
-                    inputMode="tel"
-                    value={form.phone}
-                    onChange={(e) => set("phone", e.target.value)}
-                  />
+                  <input className={inputCls} placeholder="03001234567" autoComplete="tel" inputMode="tel" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
                 </Field>
 
                 <Field label="Email Address" required error={err("email")}>
-                  <input
-                    type="email"
-                    className={inputCls}
-                    placeholder="example@email.com"
-                    autoComplete="email"
-                    value={form.email}
-                    onChange={(e) => set("email", e.target.value)}
-                  />
+                  <input type="email" className={inputCls} placeholder="example@email.com" autoComplete="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
                 </Field>
 
                 <Field label="Password" required error={err("password")}>
                   <div className="relative w-full">
                     <input
                       type={showPassword ? "text" : "password"}
+                      maxLength={72}
                       className={`${inputCls} pr-16`}
                       placeholder="Minimum 6 characters"
                       autoComplete="new-password"
@@ -534,6 +552,7 @@ export default function RegisterModal({
                   <div className="relative w-full">
                     <input
                       type={showConfirm ? "text" : "password"}
+                      maxLength={72}
                       className={`${inputCls} pr-16`}
                       placeholder="Confirm your password"
                       autoComplete="new-password"
@@ -553,68 +572,55 @@ export default function RegisterModal({
               </div>
             </section>
 
+            {form.role === "member" && (
+              <section className="w-full rounded-2xl bg-[#faf7f2] p-5 ring-1 ring-[#800020]/10 sm:p-6">
+                <div className="mb-5"><h3 className="font-extrabold text-[#800020]">Member Information</h3><p className="mt-1 text-xs text-[#800020]/55">Personal details and optional emergency contact.</p></div>
+                <div className="grid w-full grid-cols-1 gap-5 sm:grid-cols-2">
+                  <Field label="Date of Birth"><input type="date" max={today || undefined} className={inputCls} value={form.dateOfBirth} onChange={(e) => set("dateOfBirth", e.target.value)} /></Field>
+                  <Field label="Gender"><select className={inputCls} value={form.gender} onChange={(e) => set("gender", e.target.value)}><option value="">Select gender</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select></Field>
+                  <div className="sm:col-span-2"><h4 className="font-bold text-[#800020]">Address</h4></div>
+                  <Field label="Street"><input maxLength={150} className={inputCls} value={form.street} onChange={(e) => set("street", e.target.value)} /></Field>
+                  <Field label="City"><input maxLength={100} className={inputCls} value={form.city} onChange={(e) => set("city", e.target.value)} /></Field>
+                  <Field label="Country"><input maxLength={100} className={inputCls} value={form.country} onChange={(e) => set("country", e.target.value)} /></Field>
+                  <div className="sm:col-span-2 border-t border-[#800020]/10 pt-4"><h4 className="font-bold text-[#800020]">Emergency Contact</h4><p className="mt-1 text-xs text-[#800020]/55">If you add one field, complete all three.</p></div>
+                  <Field label="Contact Name"><input maxLength={60} className={inputCls} value={form.emergencyName} onChange={(e) => set("emergencyName", e.target.value)} /></Field>
+                  <Field label="Relationship"><input maxLength={50} className={inputCls} value={form.emergencyRelationship} onChange={(e) => set("emergencyRelationship", e.target.value)} /></Field>
+                  <Field label="Contact Phone"><input type="tel" maxLength={15} className={inputCls} value={form.emergencyPhone} onChange={(e) => set("emergencyPhone", e.target.value)} /></Field>
+                  <div className="sm:col-span-2 border-t border-[#800020]/10 pt-4">
+                    <h4 className="font-bold text-[#800020]">Membership Plans <span className="font-normal">(optional, select any)</span></h4>
+                    {loadingLists ? <p className="mt-2 text-sm text-[#800020]/60">Loading plans...</p> : membershipPlans.length === 0 ? <p className="mt-2 text-sm text-[#800020]/60">No active plans available.</p> : (
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        {membershipPlans.map((plan) => (
+                          <label key={plan._id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#800020]/15 bg-white p-3">
+                            <input type="checkbox" checked={form.membershipPlanIds.includes(plan._id)} onChange={(event) => set("membershipPlanIds", event.target.checked ? [...form.membershipPlanIds, plan._id] : form.membershipPlanIds.filter((id) => id !== plan._id))} className="mt-1 accent-[#800020]" />
+                            <span><span className="block text-sm font-bold text-[#800020]">{plan.name}</span><span className="text-xs text-[#800020]/60">PKR {plan.price}{plan.description ? ` · ${plan.description}` : ""}</span></span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
+
             {/* MEMBERSHIP / TRAINER INFORMATION */}
 
             <section className="w-full rounded-2xl bg-[#faf7f2] p-5 ring-1 ring-[#800020]/10 sm:p-6">
-              
-
               <div className="grid w-full grid-cols-1 gap-5 sm:grid-cols-2">
-                {/* TRAINER EXPERIENCE */}
-
                 {form.role === "trainer" && (
-                  <Field
-                    label="Professional Experience"
-                    required
-                    error={err("experience")}
-                  >
-                    <input
-                      className={inputCls}
-                      placeholder="e.g. 3 years"
-                      type="number"
-                      value={form.experience}
-                      onChange={(e) => set("experience", e.target.value)}
-                    />
+                  <Field label="Professional Experience" required error={err("experience")}>
+                    <input className={inputCls} placeholder="e.g. 3 years" type="number" value={form.experience} onChange={(e) => set("experience", e.target.value)} />
                   </Field>
                 )}
-
                 {form.role === "trainer" && (
                   <>
-                    <Field
-                      label="Specialization"
-                      required
-                      error={err("specialization")}
-                    >
-                      <input
-                        className={inputCls}
-                        placeholder="e.g. Weight Training, Yoga, Cardio"
-                        value={form.specialization}
-                        onChange={(e) => set("specialization", e.target.value)}
-                      />
+                    <Field label="Specialization" required error={err("specialization")}>
+                      <input className={inputCls} placeholder="e.g. Weight Training, Yoga, Cardio" value={form.specialization} onChange={(e) => set("specialization", e.target.value)} />
                     </Field>
-
                     <div className="sm:col-span-2">
-                      <Field
-                        label="Professional Bio"
-                        required
-                        error={err("bio")}
-                      >
-                        <textarea
-                          rows={4}
-                          maxLength={500}
-                          className={`${inputCls} resize-y`}
-                          placeholder="Tell us about yourself, your fitness journey, professional experience, certifications, achievements, and training approach..."
-                          value={form.bio}
-                          onChange={(e) => set("bio", e.target.value)}
-                        />
-
-                        <div className="mt-1 flex justify-between">
-                          <p className="text-xs text-[#800020]/50">
-                            Introduce yourself to gym members.
-                          </p>
-                          <p className="text-xs text-[#800020]/50">
-                            {form.bio.length}/500
-                          </p>
-                        </div>
+                      <Field label="Professional Bio" required error={err("bio")}>
+                        <textarea rows={4} maxLength={500} className={`${inputCls} resize-y`} placeholder="Tell us about yourself, your fitness journey, professional experience, certifications, achievements, and training approach..." value={form.bio} onChange={(e) => set("bio", e.target.value)} />
+                        <div className="mt-1 flex justify-between"><p className="text-xs text-[#800020]/50">Introduce yourself to gym members.</p><p className="text-xs text-[#800020]/50">{form.bio.length}/500</p></div>
                       </Field>
                     </div>
                   </>

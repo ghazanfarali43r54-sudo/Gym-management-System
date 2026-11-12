@@ -1,6 +1,7 @@
-const User = require("../models/user");
+const {User} = require("../models/user");
 const Member = require("../models/Member");
 const Trainer = require("../models/Trainer");
+const MembershipPlan = require("../models/membershipPlans");
 const { REQUEST_ROLES } = require("../utils/roles");
 const { validateRegistration } = require("../utils/validateRegistration");
 const OBJECT_ID = /^[a-f\d]{24}$/i;
@@ -12,6 +13,16 @@ exports.register = async (req, res) => {
 
     if (errors.length > 0) {
       return res.status(400).json({ message: errors[0] });
+    }
+
+    if (data.role === "member" && data.membershipPlanIds.length) {
+      const activePlans = await MembershipPlan.find({
+        _id: { $in: data.membershipPlanIds },
+        status: "active",
+      }).select("_id").lean();
+      if (activePlans.length !== data.membershipPlanIds.length) {
+        return res.status(400).json({ message: "One or more selected membership plans are unavailable." });
+      }
     }
 
     const existing = await User.findOne({
@@ -51,7 +62,9 @@ exports.register = async (req, res) => {
       existing.photo = data.photo;
       existing.role = data.role;
       existing.status = "pending";
-
+      existing.gender = data.gender;
+      existing.dateOfBirth = data.dateOfBirth;
+     
       await existing.save();
 
       // If role changed, remove the old profile
@@ -69,10 +82,13 @@ exports.register = async (req, res) => {
           {
             $set: {
               assignedTrainer: null,
+              membershipPlans: data.membershipPlanIds,
+              address: data.address,
+              emergencyContact: data.emergencyContact,
               rejectReason: "",
             },
           },
-          { upsert: true, new: true, runValidators: true }
+          { upsert: true, returnDocument: "after", runValidators: true }
         );
       }
 
@@ -88,7 +104,7 @@ exports.register = async (req, res) => {
               rejectReason: "",
             },
           },
-          { upsert: true, new: true, runValidators: true }
+          { upsert: true, returnDocument: "after", runValidators: true }
         );
       }
 
@@ -111,6 +127,8 @@ exports.register = async (req, res) => {
       phone: data.phone,
       photo: data.photo,
       role: data.role,
+      gender: data.gender,
+      dateOfBirth: data.dateOfBirth,
       status: "pending",
     });
 
@@ -119,6 +137,9 @@ exports.register = async (req, res) => {
       await Member.create({
         memberId: user._id,
         assignedTrainer: null,
+        address: data.address,
+        emergencyContact: data.emergencyContact,
+        membershipPlans: data.membershipPlanIds,
       });
     }
 

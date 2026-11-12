@@ -1,6 +1,53 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
+
+// Address Schema reusable schema can be used with member and trainer model
+const addressSchema = new mongoose.Schema(
+  {
+    street: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    city: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    country: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+  },
+  { _id: false }
+);
+
+// Emergency Contact Schema reusable schema can be used with member and trainer model
+const emergencyContactSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    relationship: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    phone: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+  },
+  { _id: false }
+);
+
+ 
+
 const userSchema = new mongoose.Schema(
   {
     // Basic information
@@ -43,6 +90,17 @@ const userSchema = new mongoose.Schema(
       enum: ["pending", "active", "rejected", "inactive"],
       default: "active",
     },
+    gender: {
+      type: String,
+      enum: ["male", "female", "other"],
+      default: "",
+      trim: true,
+    },
+
+    dateOfBirth: {
+      type: Date,
+      default: null,
+    },
     isDeleted: {
       type: Boolean,
       default: false,
@@ -64,5 +122,11 @@ userSchema.pre("save", async function () {
 userSchema.methods.comparePassword = function (plainPassword) {
   return bcrypt.compare(plainPassword, this.password);
 };
+const User = mongoose.models.User || mongoose.model("User", userSchema);
 
-module.exports = mongoose.models.User || mongoose.model("User", userSchema);
+// module.exports = mongoose.models.User || mongoose.model("User", userSchema);
+module.exports = {
+  User,
+  addressSchema,
+  emergencyContactSchema,
+};

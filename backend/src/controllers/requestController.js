@@ -1,6 +1,8 @@
-const User = require("../models/user");
+const { User } = require("../models/user");
 const Member = require("../models/Member");
 const TrainerData = require("../models/Trainer");
+const MembershipPlan = require("../models/membershipPlans");
+const BodyMeasurement = require("../models/BodyMeasurement");
 const { REQUEST_ROLES } = require("../utils/roles");
 
 const OBJECT_ID = /^[a-f\d]{24}$/i;
@@ -33,8 +35,14 @@ function toRequest(user, profile = {}) {
     phone: user.phone,
     photo: user.photo || "",
     status: user.status,
+    gender: user.gender || "",
+    dateOfBirth: user.dateOfBirth || null,
+    address: profile.address || { street: "", city: "", country: "" },
+    emergencyContact: profile.emergencyContact || { name: "", relationship: "", phone: "" },
 
     assignedTrainer: profile.assignedTrainer || null,
+    membershipPlans: profile.membershipPlans || [],
+    measurementCount: profile.measurementCount ?? 0,
 
     specialization: profile.specialization || "",
     experience: profile.experience ?? 0,
@@ -44,7 +52,6 @@ function toRequest(user, profile = {}) {
     createdAt: user.createdAt,
   };
 }
-
 
 // POST /api/admin/requests
 // Create a member directly from admin panel.
@@ -59,6 +66,12 @@ exports.createMember = async (req, res) => {
       password,
       status,
       assignedTrainerId,
+      address,
+      emergencyContact,
+      dateOfBirth,
+      gender,
+      membershipPlanIds = [],
+      photo = "",
     } = req.body || {};
 
     const cleanName = typeof name === "string" ? name.trim() : "";
@@ -66,21 +79,21 @@ exports.createMember = async (req, res) => {
       typeof email === "string" ? email.trim().toLowerCase() : "";
     const cleanPhone = typeof phone === "string" ? phone.trim() : "";
 
-    if (cleanName.length < 2 || cleanName.length > 60) {
+    if (!/^(?=.{2,80}$)[\p{L}]+(?:[ '\u2019-][\p{L}]+)*$/u.test(cleanName)) {
       return res.status(400).json({
-        message: "Name must be 2 to 60 characters",
+        message: "Enter a valid name using letters, spaces, apostrophes, or hyphens.",
       });
     }
 
-    if (!/^\S+@\S+\.\S+$/.test(cleanEmail) || cleanEmail.length > 100) {
+    if (!/^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$/i.test(cleanEmail) || cleanEmail.length > 100) {
       return res.status(400).json({
         message: "Enter a valid email",
       });
     }
 
-    if (!/^\+?[\d\s-]{10,15}$/.test(cleanPhone)) {
+    if (!/^[+\d()\s.-]+$/.test(cleanPhone) || cleanPhone.replace(/\D/g, "").length !== 11) {
       return res.status(400).json({
-        message: "Enter a valid phone number",
+        message: "Enter an 11-digit phone number.",
       });
     }
 
@@ -94,6 +107,10 @@ exports.createMember = async (req, res) => {
       });
     }
 
+    if (typeof photo !== "string" || (photo && (!photo.startsWith("data:image/jpeg;base64,") || photo.length > 150000))) {
+      return res.status(400).json({ message: "Photo must be a valid JPEG image." });
+    }
+
     const memberStatus =
       status === undefined ? "active" : String(status).toLowerCase();
 
@@ -103,16 +120,21 @@ exports.createMember = async (req, res) => {
       });
     }
 
-    
-
-
     if (assignedTrainerId && !OBJECT_ID.test(String(assignedTrainerId))) {
       return res.status(400).json({ message: "Invalid trainer" });
     }
 
-    const [ existing, trainer] = await Promise.all([
+    if (!Array.isArray(membershipPlanIds) || membershipPlanIds.length > 20 || membershipPlanIds.some((id) => !OBJECT_ID.test(String(id))) || new Set(membershipPlanIds.map(String)).size !== membershipPlanIds.length) {
+      return res.status(400).json({ message: "Select valid membership plans." });
+    }
+    const activePlans = membershipPlanIds.length
+      ? await MembershipPlan.find({ _id: { $in: membershipPlanIds }, status: "active" }).select("_id").lean()
+      : [];
+    if (activePlans.length !== membershipPlanIds.length) {
+      return res.status(400).json({ message: "One or more selected membership plans are unavailable." });
+    }
 
-
+    const [existing, trainer] = await Promise.all([
       User.findOne({ email: cleanEmail }),
 
       assignedTrainerId
@@ -123,10 +145,6 @@ exports.createMember = async (req, res) => {
           })
         : null,
     ]);
-
-     
-
-    
 
     if (assignedTrainerId && !trainer) {
       return res.status(400).json({
@@ -154,7 +172,7 @@ exports.createMember = async (req, res) => {
         });
       }
     }
-
+ 
     // Create authentication record.
     createdUser = await User.create({
       name: cleanName,
@@ -163,13 +181,21 @@ exports.createMember = async (req, res) => {
       password,
       role: "member",
       status: memberStatus,
+      ...(gender && { gender }),
+      ...(dateOfBirth && { dateOfBirth }),
+      ...(photo && { photo }),
+       
     });
 
     // Create member profile separately.
     const memberProfile = await Member.create({
       memberId: createdUser._id,
-      
+
       assignedTrainer: trainer?._id || null,
+      membershipPlans: membershipPlanIds,
+      emergencyContact:emergencyContact,
+      address:address
+
     });
 
     return res.status(201).json({
@@ -254,18 +280,26 @@ exports.listRequests = async (req, res) => {
       .map((u) => u._id);
 
     // Fetch member profiles.
-    const memberProfiles = await Member.find({
-      memberId: { $in: memberIds },
-    })
-    //!when i want to add brainhes then i just uncument this & update admintrainerdashboard function..below:
+    const [memberProfiles, measurementCounts] = await Promise.all([
+      Member.find({ memberId: { $in: memberIds } })
+      //!when i want to add brainhes then i just uncument this & update admintrainerdashboard function..below:
       .populate("assignedTrainer", "name email phone photo")
-      .lean();
+      .populate("membershipPlans", "name price status")
+      .lean(),
+      BodyMeasurement.aggregate([
+        { $match: { memberId: { $in: memberIds } } },
+        { $group: { _id: "$memberId", count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    const measurementCountMap = new Map(
+      measurementCounts.map((item) => [String(item._id), item.count])
+    );
 
     // Fetch trainer profiles.
     const trainerProfiles = await TrainerData.find({
       trainerId: { $in: trainerIds },
-    })
-      .lean();
+    }).lean();
 
     const memberMap = new Map(
       memberProfiles.map((profile) => [String(profile.memberId), profile])
@@ -281,7 +315,10 @@ exports.listRequests = async (req, res) => {
           ? memberMap.get(String(user._id))
           : trainerMap.get(String(user._id));
 
-      return toRequest(user, profile || {});
+      return toRequest(user, {
+        ...(profile || {}),
+        measurementCount: measurementCountMap.get(String(user._id)) || 0,
+      });
     });
 
     return res.json({
@@ -455,16 +492,27 @@ exports.updateRequest = async (req, res) => {
       });
     }
 
-    const { name, email, phone, status, assignedTrainerId } =
-      req.body || {};
+    const {
+      name,
+      email,
+      phone,
+      status,
+      assignedTrainerId,
+      dateOfBirth,
+      gender,
+      address,
+      emergencyContact,
+      membershipPlanIds,
+      photo,
+    } = req.body || {};
 
     // Update User fields.
     if (name !== undefined) {
       const cleanName = String(name).trim();
 
-      if (cleanName.length < 2 || cleanName.length > 60) {
+      if (!/^(?=.{2,80}$)[\p{L}]+(?:[ '\u2019-][\p{L}]+)*$/u.test(cleanName)) {
         return res.status(400).json({
-          message: "Name must be 2 to 60 characters",
+          message: "Enter a valid name using letters, spaces, apostrophes, or hyphens.",
         });
       }
 
@@ -474,7 +522,7 @@ exports.updateRequest = async (req, res) => {
     if (email !== undefined) {
       const cleanEmail = String(email).trim().toLowerCase();
 
-      if (!/^\S+@\S+\.\S+$/.test(cleanEmail) || cleanEmail.length > 100) {
+      if (!/^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$/i.test(cleanEmail) || cleanEmail.length > 100) {
         return res.status(400).json({
           message: "Enter a valid email",
         });
@@ -486,20 +534,58 @@ exports.updateRequest = async (req, res) => {
     if (phone !== undefined) {
       const cleanPhone = String(phone).trim();
 
-      if (!/^\+?[\d\s-]{10,15}$/.test(cleanPhone)) {
+      if (!/^[+\d()\s.-]+$/.test(cleanPhone) || cleanPhone.replace(/\D/g, "").length !== 11) {
         return res.status(400).json({
-          message: "Enter a valid phone number",
+          message: "Enter an 11-digit phone number.",
         });
       }
 
       user.phone = cleanPhone;
     }
+    if (photo !== undefined) {
+      if (typeof photo !== "string" || (photo && (!photo.startsWith("data:image/jpeg;base64,") || photo.length > 150000))) {
+        return res.status(400).json({ message: "Photo must be a valid JPEG image no larger than 2 MB." });
+      }
+      user.photo = photo;
+    }
+    if (membershipPlanIds !== undefined) {
+      if (!Array.isArray(membershipPlanIds) || membershipPlanIds.length > 20 || membershipPlanIds.some((id) => !OBJECT_ID.test(String(id))) || new Set(membershipPlanIds.map(String)).size !== membershipPlanIds.length) {
+        return res.status(400).json({ message: "Select valid membership plans." });
+      }
+      const existingPlanIds = new Set((profile.membershipPlans || []).map(String));
+      const eligiblePlans = membershipPlanIds.length
+        ? await MembershipPlan.find({
+            _id: { $in: membershipPlanIds },
+            $or: [{ status: "active" }, { _id: { $in: [...existingPlanIds] } }],
+          }).select("_id").lean()
+        : [];
+      if (eligiblePlans.length !== membershipPlanIds.length) {
+        return res.status(400).json({ message: "One or more selected membership plans are unavailable." });
+      }
+      profile.membershipPlans = membershipPlanIds;
+    }
+    //!validation
+    if (gender !== undefined) {
+      if (gender && !["male", "female", "other"].includes(String(gender).toLowerCase())) {
+        return res.status(400).json({ message: "Select a valid gender" });
+      }
+      user.gender = String(gender).toLowerCase();
+    }
+    if (dateOfBirth !== undefined) {
+      const parsedDate = dateOfBirth ? new Date(dateOfBirth) : null;
+      if (dateOfBirth && (Number.isNaN(parsedDate.getTime()) || parsedDate > new Date())) {
+        return res.status(400).json({ message: "Enter a valid date of birth" });
+      }
+      user.dateOfBirth = parsedDate;
+    }
+    //!validation
+    // if(emergencyContact){
+    //   user.emergencyContact=emergencyContact;
+    // }
+    // if(address){
+    //   user.address=address;
+    // }
 
-  
-
- 
-    
- 
     // Update trainer assignment in MemberData.
     if (assignedTrainerId !== undefined) {
       if (assignedTrainerId && !OBJECT_ID.test(String(assignedTrainerId))) {
@@ -564,10 +650,26 @@ exports.updateRequest = async (req, res) => {
 
     await Promise.all([user.save(), profile.save()]);
 
+    //update member data
+    await Member.findOneAndUpdate(
+      {
+        memberId: user._id,
+      },
+      {
+        ...(address && { address }),
+        ...(emergencyContact && { emergencyContact }),
+      },
+      {
+        returnDocument: "after",
+        runValidators: true,
+      }
+    );
+
     const updatedProfile = await Member.findOne({
       memberId: user._id,
     })
       .populate("assignedTrainer", "name email phone photo")
+      .populate("membershipPlans", "name price status")
       .lean();
 
     return res.json({

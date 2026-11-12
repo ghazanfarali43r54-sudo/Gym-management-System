@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { addressSchema, emergencyContactSchema } = require("./user");
 
 const memberSchema = new mongoose.Schema(
   {
@@ -7,21 +8,30 @@ const memberSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
-   
+    membershipPlans: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "MembershipPlan",
+    }],
+
     memberId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
       unique: true,
     },
-    description: { type: String,
-      trim: true,
-      default: "",
-      maxlength: 300
-     },
-     isDeleted: {
+    description: { type: String, trim: true, default: "", maxlength: 300 },
+
+    isDeleted: {
       type: Boolean,
       default: false,
+    },
+    address: {
+      type: addressSchema,
+      default: () => ({}),
+    },
+    emergencyContact: {
+      type: emergencyContactSchema,
+      default: () => ({}),
     },
   },
   {

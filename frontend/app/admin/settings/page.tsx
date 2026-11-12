@@ -6,7 +6,6 @@ import AdminShell, {
   type IconName,
 } from "@/components/admin/AdminShell";
 import { adminApiFetch } from "@/lib/api"; 
-import CatalogManager from "@/components/admin/CatalogManager";
 import { useSettings } from "@/lib/SettingsContext";
 
 /* ================= TYPES ================= */
@@ -98,7 +97,7 @@ const tabs: {
     key: "membership",
     label: "Membership Rules",
     desc: "Fees, grace & freeze",
-    icon: "plans",
+    icon: "settings",
   },
   {
     key: "notifications",

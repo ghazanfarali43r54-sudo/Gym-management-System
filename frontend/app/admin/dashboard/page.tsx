@@ -186,6 +186,8 @@ const nav: {
     group: "Members",
     items: [
       { label: "Members", href: "/admin/members", icon: "members" },
+      { label: "Membership", href: "/admin/membership", icon: "members" },
+      { label: "Features", href: "/admin/features", icon: "tag" },
       { label: "Attendance", href: "/admin/Attendance", icon: "attendance" },
       { label: "Requests", href: "/admin/requests", icon: "members" },
     ],
@@ -703,12 +705,32 @@ function AreaChart({
 
 /* ---------- donut ---------- */
 
+
 function Donut({ children }: { children: ReactNode }) {
   const r = 70;
   const c = 2 * Math.PI * r;
 
-  // har segment ka offset pehle calculate karo (render me koi variable mutate nahi hota)
-   
+  // Dummy membership distribution
+  const segmentData = [
+    { key: "active", value: 65, color: "#800020" },
+    { key: "pending", value: 20, color: "#d4881f" },
+    { key: "expired", value: 15, color: "#2f9e6a" },
+  ];
+
+  let currentOffset = 0;
+
+  const segments = segmentData.map((segment) => {
+    const dash = (segment.value / 100) * c;
+    const result = {
+      key: segment.key,
+      color: segment.color,
+      dash,
+      offset: currentOffset,
+    };
+
+    currentOffset += dash;
+    return result;
+  });
 
   return (
     <div className="relative h-52 w-52 shrink-0">
@@ -726,6 +748,7 @@ function Donut({ children }: { children: ReactNode }) {
           strokeOpacity="0.07"
           strokeWidth="24"
         />
+
         {segments.map((seg) => (
           <circle
             key={seg.key}
@@ -741,12 +764,14 @@ function Donut({ children }: { children: ReactNode }) {
           />
         ))}
       </svg>
+
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
         {children}
       </div>
     </div>
   );
 }
+
 
 /* ---------- progress ring ---------- */
 
@@ -1072,7 +1097,7 @@ export default function Dashboard() {
       value: fmt(986),
       change: "+8%",
       up: true,
-      icon: "plans" as IconName,
+      icon: "tag" as IconName,
       color: "#c0405a",
       spark: [20, 22, 21, 26, 25, 30, 33],
     },

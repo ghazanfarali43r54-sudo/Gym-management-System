@@ -1,4 +1,4 @@
-const User = require("../models/user");
+const {User} = require("../models/user");
 const Member = require("../models/Member");
 const Trainer = require("../models/Trainer");
 const jwt = require("jsonwebtoken");

@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import AdminShell from "@/components/admin/AdminShell";
 import { apiFetch } from "@/lib/api";
 import { useSettings } from "@/lib/SettingsContext";
@@ -9,7 +10,7 @@ import {
   isValidPersonName,
   phoneError,
 } from "@/lib/formValidation";
-
+import MemberFitnessRecords from "@/components/admin/MemberFitnessRecords";
 type MemberStatus = "Active" | "Inactive" | "Pending";
 
 type TrainerOption = {
@@ -23,6 +24,8 @@ type TrainerOption = {
   isFull?: boolean;
 };
 
+type MembershipPlanOption = { _id: string; name: string; price: number; description?: string; status?: "active" | "inactive" };
+
 type Member = {
   id: string;
   name: string;
@@ -31,6 +34,13 @@ type Member = {
   status: MemberStatus;
   assignedTrainerId?: string;
   assignedTrainerName?: string;
+  gender: string;
+  dateOfBirth: string;
+  address: { street: string; city: string; country: string };
+  emergencyContact: { name: string; relationship: string; phone: string };
+  photo: string;
+  membershipPlans: MembershipPlanOption[];
+  measurementCount: number;
 };
 
 type MemberForm = {
@@ -39,6 +49,15 @@ type MemberForm = {
   phone: string;
   password: string;
   status: MemberStatus;
+  gender: string;
+  dateOfBirth: string;
+  street: string;
+  city: string;
+  country: string;
+  emergencyName: string;
+  emergencyRelationship: string;
+  emergencyPhone: string;
+  confirmPassword: string;
 };
 
 const emptyForm: MemberForm = {
@@ -47,6 +66,15 @@ const emptyForm: MemberForm = {
   phone: "",
   password: "",
   status: "Active",
+  gender: "",
+  dateOfBirth: "",
+  street: "",
+  city: "",
+  country: "",
+  emergencyName: "",
+  emergencyRelationship: "",
+  emergencyPhone: "",
+  confirmPassword: "",
 };
 
 function getArray<T>(response: any, key: string): T[] {
@@ -96,6 +124,13 @@ function normalizeMember(item: any): Member {
     status: normalizeStatus(item.status),
     assignedTrainerId: String(assignedTrainerId || ""),
     assignedTrainerName: String(assignedTrainerName || ""),
+    gender: item.gender ?? "",
+    dateOfBirth: item.dateOfBirth ? String(item.dateOfBirth).slice(0, 10) : "",
+    address: item.address ?? { street: "", city: "", country: "" },
+    emergencyContact: item.emergencyContact ?? { name: "", relationship: "", phone: "" },
+    photo: item.photo ?? "",
+    membershipPlans: Array.isArray(item.membershipPlans) ? item.membershipPlans.map((plan: any) => typeof plan === "string" ? { _id: plan, name: "Membership plan", price: 0 } : plan) : [],
+    measurementCount: Number(item.measurementCount ?? 0),
   };
 }
 
@@ -117,11 +152,10 @@ function statusClass(status: MemberStatus) {
 
 type MemberDetailsProps = {
   member: Member;
-  onBack: () => void;
   onEdit: () => void;
 };
 
-function MemberDetails({ member, onBack, onEdit }: MemberDetailsProps) {
+function MemberDetails({ member, onEdit }: MemberDetailsProps) {
   const initials = member.name
     .trim()
     .split(/\s+/)
@@ -154,20 +188,12 @@ function MemberDetails({ member, onBack, onEdit }: MemberDetailsProps) {
 
   return (
     <div className="min-h-screen space-y-6 bg-[#f8f6f2] p-4 text-[#342323] sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-2 rounded-xl border border-[#e7dcd6] bg-white px-4 py-2.5 text-sm font-semibold text-[#641d32] transition hover:bg-[#faf2f3]"
-        >
-          <span aria-hidden="true">←</span>
-          Back to Members
-        </button>
+      <div className="flex flex-wrap items-center justify-end gap-">
 
         <button
           type="button"
           onClick={onEdit}
-          className="rounded-xl bg-[#641d32] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4b1725]"
+          className="rounded-xl bg-[#641d32]   px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#4b1725]"
         >
           Edit Member
         </button>
@@ -209,9 +235,6 @@ function MemberDetails({ member, onBack, onEdit }: MemberDetailsProps) {
                 </span>
               </div>
 
-              <p className="mt-3 text-xs text-[#a18f88]">
-                Member ID: {member.id || "Not available"}
-              </p>
             </div>
           </div>
         </div>
@@ -254,6 +277,13 @@ function MemberDetails({ member, onBack, onEdit }: MemberDetailsProps) {
               </p>
             </div>
 
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-[#a18f88]">Membership Plans</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {member.membershipPlans.length ? member.membershipPlans.map((plan) => <span key={plan._id} className="rounded-full bg-[#f3eae5] px-3 py-1 text-xs font-semibold text-[#641d32]">{plan.name}</span>) : <span className="text-sm text-[#8b7771]">No plans assigned</span>}
+              </div>
+            </div>
+
             {/* Assigned Trainer */}
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-[#a18f88]">
@@ -261,15 +291,6 @@ function MemberDetails({ member, onBack, onEdit }: MemberDetailsProps) {
               </p>
               <p className="mt-1 font-semibold text-[#641d32]">
                 {member.assignedTrainerName || "No trainer assigned"}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-[#a18f88]">
-                Member ID
-              </p>
-              <p className="mt-1 break-all font-medium text-[#6f5b55]">
-                {member.id || "—"}
               </p>
             </div>
           </div>
@@ -292,6 +313,7 @@ function MemberDetails({ member, onBack, onEdit }: MemberDetailsProps) {
           </div>
         </section>
       </div>
+      <MemberFitnessRecords memberId={member.id} />
     </div>
   );
 }
@@ -300,12 +322,18 @@ function MemberDetails({ member, onBack, onEdit }: MemberDetailsProps) {
    MEMBERS PAGE
 ------------------------------------------------------- */
 
-export default function MembersPage() {
+function MembersPageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const { settings } = useSettings();
   const gymName = settings?.general?.gymName || "Gym Management";
 
   const [members, setMembers] = useState<Member[]>([]);
   const [trainers, setTrainers] = useState<TrainerOption[]>([]);
+  const [membershipPlans, setMembershipPlans] = useState<MembershipPlanOption[]>([]);
+  const [membershipPlanIds, setMembershipPlanIds] = useState<string[]>([]);
+  const [photo, setPhoto] = useState("");
+  const [photoError, setPhotoError] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [optionsLoading, setOptionsLoading] = useState(false);
@@ -323,6 +351,41 @@ export default function MembersPage() {
 
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [error, setError] = useState("");
+  const [today, setToday] = useState("");
+
+  useEffect(() => {
+    setToday(new Date().toISOString().slice(0, 10));
+  }, []);
+
+  // Native <details> menus stay open until their own summary is toggled.
+  // Close an open actions menu when the pointer lands elsewhere on the page.
+  useEffect(() => {
+    const closeMenusOnOutsideClick = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+
+      document
+        .querySelectorAll<HTMLDetailsElement>("details[open]")
+        .forEach((menu) => {
+          if (!menu.contains(target)) menu.open = false;
+        });
+    };
+
+    document.addEventListener("pointerdown", closeMenusOnOutsideClick);
+    return () =>
+      document.removeEventListener("pointerdown", closeMenusOnOutsideClick);
+  }, []);
+
+  // Keep detail selection in the URL so browser back returns to the member list.
+  useEffect(() => {
+    const memberId = searchParams.get("member");
+    if (!memberId || searchParams.get("view") === "list") {
+      setSelectedMember(null);
+      return;
+    }
+    const matchingMember = members.find((member) => member.id === memberId);
+    if (matchingMember) setSelectedMember(matchingMember);
+  }, [searchParams, members]);
 
   const loadMembers = async () => {
     try {
@@ -380,7 +443,11 @@ export default function MembersPage() {
   const loadOptions = async () => {
     try {
       setOptionsLoading(true);
+      const response: any = await apiFetch("/api/public/membership-plans");
+      if (!response.ok) throw new Error(response.data?.message || "Unable to load membership plans.");
+      setMembershipPlans(getArray<MembershipPlanOption>(response, "data"));
     } catch (err) {
+      setMembershipPlans([]);
     } finally {
       setOptionsLoading(false);
     }
@@ -412,6 +479,8 @@ export default function MembersPage() {
     setEditingMember(null);
     setForm(emptyForm);
     setTrainerId("");
+    setMembershipPlanIds([]);
+    setPhoto("");
     setError("");
     setShowModal(true);
 
@@ -428,7 +497,19 @@ export default function MembersPage() {
       password: "",
 
       status: member.status,
+      gender: member.gender,
+      dateOfBirth: member.dateOfBirth,
+      street: member.address.street || "",
+      city: member.address.city || "",
+      country: member.address.country || "",
+      emergencyName: member.emergencyContact.name || "",
+      emergencyRelationship: member.emergencyContact.relationship || "",
+      emergencyPhone: member.emergencyContact.phone || "",
+      confirmPassword: "",
     });
+
+    setMembershipPlanIds(member.membershipPlans.map((plan) => plan._id));
+    setPhoto(member.photo || "");
 
     setTrainerId(member.assignedTrainerId || "");
 
@@ -445,6 +526,8 @@ export default function MembersPage() {
     setEditingMember(null);
     setForm(emptyForm);
     setTrainerId("");
+    setMembershipPlanIds([]);
+    setPhoto("");
     setError("");
   };
 
@@ -453,6 +536,33 @@ export default function MembersPage() {
       ...previous,
       [field]: value,
     }));
+  };
+
+  const handlePhoto = async (file?: File) => {
+    if (!file) return;
+    setPhotoError("");
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setPhotoError("Choose a PNG, JPG, or WEBP image.");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setPhotoError("Photo must be smaller than 2 MB.");
+      return;
+    }
+    try {
+      const bitmap = await createImageBitmap(file);
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 256;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Image processing is unavailable.");
+      const side = Math.min(bitmap.width, bitmap.height);
+      context.drawImage(bitmap, (bitmap.width - side) / 2, (bitmap.height - side) / 2, side, side, 0, 0, 256, 256);
+      bitmap.close();
+      setPhoto(canvas.toDataURL("image/jpeg", 0.85));
+    } catch {
+      setPhotoError("Unable to process this photo.");
+    }
   };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -483,8 +593,17 @@ export default function MembersPage() {
       return;
     }
 
-    if (!editingMember && form.password.length < 8) {
-      setError("Password must be at least 8 characters long.");
+    if (!editingMember && form.password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return;
+    }
+    if (!editingMember && form.password.length > 72) {
+      setError("Password must be 72 characters or fewer.");
+      return;
+    }
+
+    if (!editingMember && form.confirmPassword !== form.password) {
+      setError("Passwords do not match.");
       return;
     }
 
@@ -498,6 +617,12 @@ export default function MembersPage() {
           phone: form.phone.trim(),
           status: form.status.toLowerCase(),
           assignedTrainerId: trainerId || null,
+          gender: form.gender || "",
+          dateOfBirth: form.dateOfBirth || null,
+          address: { street: form.street.trim(), city: form.city.trim(), country: form.country.trim() },
+          emergencyContact: { name: form.emergencyName.trim(), relationship: form.emergencyRelationship.trim(), phone: form.emergencyPhone.trim() },
+          membershipPlanIds,
+          photo,
         };
 
         const response = await apiFetch(
@@ -520,8 +645,13 @@ export default function MembersPage() {
           role: "member",
           status: form.status.toLowerCase(),
           message: "",
-          photo: "",
           assignedTrainerId: trainerId || null,
+          gender: form.gender || "",
+          dateOfBirth: form.dateOfBirth || null,
+          address: { street: form.street.trim(), city: form.city.trim(), country: form.country.trim() },
+          emergencyContact: { name: form.emergencyName.trim(), relationship: form.emergencyRelationship.trim(), phone: form.emergencyPhone.trim() },
+          membershipPlanIds,
+          photo,
         };
 
         const response = await apiFetch("/api/admin/requests", {
@@ -538,6 +668,8 @@ export default function MembersPage() {
       setEditingMember(null);
       setForm(emptyForm);
       setTrainerId("");
+      setMembershipPlanIds([]);
+      setPhoto("");
       setError("");
 
       await loadMembers();
@@ -598,6 +730,10 @@ export default function MembersPage() {
     }
   };
 
+  const openFitnessEntry = (member: Member, type: "body-measurement" | "fitness-assessment") => {
+    router.push(`/admin/members/${encodeURIComponent(member.id)}/fitness/${type}`);
+  };
+
   const activeCount = members.filter(
     (member) => member.status === "Active"
   ).length;
@@ -615,7 +751,6 @@ export default function MembersPage() {
       {showModal ? null : selectedMember ? (
         <MemberDetails
           member={selectedMember}
-          onBack={() => setSelectedMember(null)}
           onEdit={() => openEditModal(selectedMember)}
         />
       ) : (
@@ -694,7 +829,7 @@ export default function MembersPage() {
           )}
 
           {/* Members table */}
-          <div className="overflow-hidden rounded-2xl border border-[#eadfd9] bg-white shadow-sm">
+          <div className="overflow-visible rounded-2xl border border-[#eadfd9] bg-white shadow-sm">
             <div className="border-b border-[#eee5e0] px-5 py-4">
               <h2 className="font-bold text-[#4b1725]">All Members</h2>
               <p className="mt-1 text-xs text-[#8b7771]">
@@ -716,12 +851,13 @@ export default function MembersPage() {
             ) : (
               <>
                 {/* Desktop table */}
-                <div className="hidden overflow-x-auto md:block">
+                <div className="hidden overflow-visible md:block">
                   <table className="w-full text-left text-sm">
                     <thead className="bg-[#faf6f2] text-xs uppercase text-[#8b7771]">
                       <tr>
                         <th className="px-5 py-4">Member</th>
                         <th className="px-5 py-4">Phone</th>
+                        <th className="px-5 py-4">Measurements</th>
 
                         <th className="px-5 py-4">Status</th>
                         <th className="px-5 py-4 text-right">Actions</th>
@@ -729,10 +865,13 @@ export default function MembersPage() {
                     </thead>
 
                     <tbody className="divide-y divide-[#f0e8e3]">
-                      {filteredMembers.map((member) => (
+                      {filteredMembers.map((member, index) => (
                         <tr
                           key={member.id}
-                          onClick={() => setSelectedMember(member)}
+                          onClick={() => {
+                            setSelectedMember(member);
+                            router.push(`/admin/members?member=${encodeURIComponent(member.id)}`);
+                          }}
                           className="cursor-pointer transition hover:bg-[#fcf8f5]"
                         >
                           <td className="px-5 py-4">
@@ -746,6 +885,12 @@ export default function MembersPage() {
 
                           <td className="px-5 py-4 text-[#6f5b55]">
                             {member.phone || "—"}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <span className="inline-flex min-w-9 items-center justify-center rounded-full bg-[#f3eae5] px-3 py-1 text-xs font-semibold text-[#641d32]" title={`${member.measurementCount} body measurement record${member.measurementCount === 1 ? "" : "s"}`}>
+                              {member.measurementCount}
+                            </span>
                           </td>
 
                           <td className="px-5 py-4">
@@ -769,12 +914,24 @@ export default function MembersPage() {
                               >
                                 ⋮
                               </summary>
-                              <div className="absolute right-0 top-11 z-20 min-w-40 rounded-xl border border-[#eadfd9] bg-white p-1.5 shadow-lg">
+                              <div className={`absolute right-0 z-20 min-w-48 rounded-xl border border-[#eadfd9] bg-white p-1.5 shadow-lg ${index === filteredMembers.length - 1 ? "bottom-11" : "top-11"}`}>
                                 <button
                                   onClick={() => openEditModal(member)}
-                                  className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#641d32] hover:bg-[#faf2f3]"
+                                  className="w-full whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm font-medium text-[#641d32] hover:bg-[#faf2f3]"
                                 >
                                   Edit
+                                </button>
+                                <button
+                                  onClick={() => openFitnessEntry(member, "body-measurement")}
+                                  className="w-full whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm font-medium text-[#641d32] hover:bg-[#faf2f3]"
+                                >
+                                  Body Measurement
+                                </button>
+                                <button
+                                  onClick={() => openFitnessEntry(member, "fitness-assessment")}
+                                  className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#641d32] hover:bg-[#faf2f3]"
+                                >
+                                  Fitness Assessment
                                 </button>
                                 <button
                                   onClick={() => toggleStatus(member)}
@@ -801,10 +958,13 @@ export default function MembersPage() {
 
                 {/* Mobile cards */}
                 <div className="space-y-3 p-4 md:hidden">
-                  {filteredMembers.map((member) => (
+                  {filteredMembers.map((member, index) => (
                     <article
                       key={member.id}
-                      onClick={() => setSelectedMember(member)}
+                      onClick={() => {
+                        setSelectedMember(member);
+                        router.push(`/admin/members?member=${encodeURIComponent(member.id)}`);
+                      }}
                       className="cursor-pointer rounded-xl border border-[#eadfd9] bg-[#fffdfa] p-4 transition hover:border-[#c9aeb4]"
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -833,6 +993,12 @@ export default function MembersPage() {
                             {member.phone || "—"}
                           </p>
                         </div>
+                        <div>
+                          <p className="text-[#9a8982]">Measurements</p>
+                          <p className="mt-1 font-semibold text-[#641d32]">
+                            {member.measurementCount}
+                          </p>
+                        </div>
                       </div>
 
                       <div
@@ -846,12 +1012,24 @@ export default function MembersPage() {
                           >
                             ⋮
                           </summary>
-                          <div className="absolute right-0 top-11 z-20 min-w-40 rounded-xl border border-[#eadfd9] bg-white p-1.5 shadow-lg">
+                          <div className={`absolute right-0 z-20 min-w-48 rounded-xl border border-[#eadfd9] bg-white p-1.5 shadow-lg ${index === filteredMembers.length - 1 ? "bottom-11" : "top-11"}`}>
                             <button
                               onClick={() => openEditModal(member)}
-                              className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#641d32] hover:bg-[#faf2f3]"
+                              className="w-full whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm font-medium text-[#641d32] hover:bg-[#faf2f3]"
                             >
                               Edit
+                            </button>
+                            <button
+                              onClick={() => openFitnessEntry(member, "body-measurement")}
+                              className="w-full whitespace-nowrap rounded-lg px-3 py-2 text-left text-sm font-medium text-[#641d32] hover:bg-[#faf2f3]"
+                            >
+                              Body Measurement
+                            </button>
+                            <button
+                              onClick={() => openFitnessEntry(member, "fitness-assessment")}
+                              className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-[#641d32] hover:bg-[#faf2f3]"
+                            >
+                              Fitness Assessment
                             </button>
                             <button
                               onClick={() => toggleStatus(member)}
@@ -892,7 +1070,7 @@ export default function MembersPage() {
                 <p className="mt-1 text-xs text-[#8b7771] sm:text-sm">
                   {editingMember
                     ? "Update the member details below."
-                    : "Enter member details and optionally assign a trainer."}
+                    : "Enter member details and optionally assign plans or a trainer."}
                 </p>
               </div>
 
@@ -916,7 +1094,14 @@ export default function MembersPage() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
+          <div className="mb-6 rounded-xl border border-[#e7dcd6] bg-[#fffdfa] p-4">
+            <h3 className="text-sm font-semibold text-[#4b1725]">Profile Picture <span className="font-normal text-[#8b7771]">(Optional)</span></h3>
+            <div className="mt-3 flex items-center gap-4">
+              <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#f3eae5] text-xl font-bold text-[#641d32]">{photo ? <img src={photo} alt="Member profile preview" className="h-full w-full object-cover" /> : form.name.trim().charAt(0).toUpperCase() || "M"}</div>
+              <div><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { void handlePhoto(event.target.files?.[0]); event.target.value = ""; }} className="block text-sm" /><p className="mt-1 text-xs text-[#8b7771]">PNG, JPG or WEBP, maximum 2 MB.</p>{photo && <button type="button" onClick={() => setPhoto("")} className="mt-1 text-xs font-semibold text-[#641d32] underline">Remove photo</button>}{photoError && <p className="mt-1 text-xs text-red-700">{photoError}</p>}</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
                   {/* Full Name */}
                   <div>
                     <label className="mb-2 block text-sm font-semibold text-[#4b1725]">
@@ -982,17 +1167,53 @@ export default function MembersPage() {
                       <input
                         required
                         type="password"
-                        minLength={8}
+                        minLength={6}
+                        maxLength={72}
                         autoComplete="new-password"
                         value={form.password}
                         onChange={(event) =>
                           updateField("password", event.target.value)
                         }
-                        placeholder="At least 8 characters"
+                        placeholder="At least 6 characters"
                         className="w-full rounded-xl border border-[#e7dcd6] bg-white px-4 py-3 text-sm outline-none focus:border-[#641d32]"
                       />
                     </div>
                   )}
+
+                  {!editingMember && (
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-[#4b1725]">Confirm Password *</label>
+                      <input required type="password" minLength={6} maxLength={72} autoComplete="new-password" value={form.confirmPassword} onChange={(event) => updateField("confirmPassword", event.target.value)} placeholder="Confirm password" className="w-full rounded-xl border border-[#e7dcd6] bg-white px-4 py-3 text-sm outline-none focus:border-[#641d32]" />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-[#4b1725]">Date of Birth</label>
+                    <input type="date" value={form.dateOfBirth} max={today || undefined} onChange={(event) => updateField("dateOfBirth", event.target.value)} className="w-full rounded-xl border border-[#e7dcd6] bg-white px-4 py-3 text-sm outline-none focus:border-[#641d32]" />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-[#4b1725]">Gender</label>
+                    <select value={form.gender} onChange={(event) => updateField("gender", event.target.value)} className="w-full rounded-xl border border-[#e7dcd6] bg-white px-4 py-3 text-sm outline-none focus:border-[#641d32]">
+                      <option value="">Select gender</option><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-2 border-t border-[#eadfd9] pt-4"><h3 className="font-semibold text-[#4b1725]">Address</h3></div>
+                  {[ ["street", "Street"], ["city", "City"], ["country", "Country"] ].map(([key, label]) => (
+                    <div key={key}><label className="mb-2 block text-sm font-semibold text-[#4b1725]">{label}</label><input value={form[key as keyof MemberForm] as string} onChange={(event) => updateField(key as keyof MemberForm, event.target.value)} maxLength={key === "street" ? 150 : 100} className="w-full rounded-xl border border-[#e7dcd6] bg-white px-4 py-3 text-sm outline-none focus:border-[#641d32]" /></div>
+                  ))}
+                  <div className="md:col-span-2 border-t border-[#eadfd9] pt-4"><h3 className="font-semibold text-[#4b1725]">Emergency Contact <span className="font-normal text-[#9b8982]">(complete all fields if provided)</span></h3></div>
+                  {([["emergencyName", "Name"], ["emergencyRelationship", "Relationship"], ["emergencyPhone", "Phone"]] as const).map(([key, label]) => (
+                    <div key={key}><label className="mb-2 block text-sm font-semibold text-[#4b1725]">{label}</label><input type={key === "emergencyPhone" ? "tel" : "text"} value={form[key]} onChange={(event) => updateField(key, event.target.value)} maxLength={key === "emergencyName" ? 60 : key === "emergencyRelationship" ? 50 : 15} className="w-full rounded-xl border border-[#e7dcd6] bg-white px-4 py-3 text-sm outline-none focus:border-[#641d32]" /></div>
+                  ))}
+
+                  <div className="md:col-span-2 border-t border-[#eadfd9] pt-4">
+                    <h3 className="font-semibold text-[#4b1725]">Membership Plans <span className="font-normal text-[#9b8982]">(Optional, select any active plans)</span></h3>
+                    {(() => {
+                      const currentInactivePlans = editingMember?.membershipPlans.filter((plan) => plan.status === "inactive" && !membershipPlans.some((active) => active._id === plan._id)) || [];
+                      const visiblePlans = [...membershipPlans, ...currentInactivePlans];
+                      return visiblePlans.length === 0 ? <p className="mt-2 text-sm text-[#8b7771]">No active plans available.</p> : <div className="mt-3 grid gap-3 sm:grid-cols-2">{visiblePlans.map((plan) => <label key={plan._id} className="flex cursor-pointer items-start gap-3 rounded-xl border border-[#e7dcd6] p-3"><input type="checkbox" checked={membershipPlanIds.includes(plan._id)} disabled={plan.status === "inactive" && !membershipPlanIds.includes(plan._id)} onChange={(event) => setMembershipPlanIds((current) => event.target.checked ? [...current, plan._id] : current.filter((id) => id !== plan._id))} className="mt-1 accent-[#641d32]" /><span><span className="block text-sm font-semibold text-[#4b1725]">{plan.name}</span><span className="text-xs text-[#8b7771]">{plan.status === "inactive" ? "Inactive · currently assigned" : `PKR ${plan.price}${plan.description ? ` · ${plan.description}` : ""}`}</span></span></label>)}</div>;
+                    })()}
+                  </div>
 
                   {/* Optional Trainer Assignment */}
                   <div>
@@ -1102,5 +1323,13 @@ export default function MembersPage() {
         </section>
       )}
     </AdminShell>
+  );
+}
+
+export default function MembersPage() {
+  return (
+    <Suspense fallback={<div className="p-6">Loading members...</div>}>
+      <MembersPageContent />
+    </Suspense>
   );
 }

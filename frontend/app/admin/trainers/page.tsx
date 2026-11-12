@@ -248,6 +248,24 @@ export default function TrainersPage() {
 
   const [deleteTrainer, setDeleteTrainer] = useState<Trainer | null>(null);
 
+  // Close trainer action menus when a pointer press lands outside the open menu.
+  useEffect(() => {
+    const closeMenusOnOutsideClick = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+
+      document
+        .querySelectorAll<HTMLDetailsElement>("details[open]")
+        .forEach((menu) => {
+          if (!menu.contains(target)) menu.open = false;
+        });
+    };
+
+    document.addEventListener("pointerdown", closeMenusOnOutsideClick);
+    return () =>
+      document.removeEventListener("pointerdown", closeMenusOnOutsideClick);
+  }, []);
+
   /* =======================================================
      FETCH TRAINERS
   ======================================================= */
@@ -619,7 +637,7 @@ export default function TrainersPage() {
 
             {/* TRAINERS SECTION */}
 
-            <div className="overflow-hidden rounded-2xl border border-[#eee7e4] bg-white shadow-sm">
+            <div className="overflow-visible rounded-2xl border border-[#eee7e4] bg-white shadow-sm">
               <div className="border-b border-[#eee7e4] p-5">
                 <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
                   <div>
@@ -704,7 +722,7 @@ export default function TrainersPage() {
                 <>
                   {/* DESKTOP TABLE */}
 
-                   <div className="hidden w-full max-w-full overflow-x-hidden md:block">
+                   <div className="hidden w-full max-w-full overflow-visible md:block">
                    <table className="w-full table-fixed text-left"> 
                       <thead className="bg-[#faf8f6] text-xs uppercase tracking-wider text-gray-500">
                         <tr>
@@ -727,7 +745,7 @@ export default function TrainersPage() {
                       </thead>
 
                       <tbody className="divide-y divide-gray-100">
-                        {filteredTrainers.map((trainer) => (
+                        {filteredTrainers.map((trainer, index) => (
                           <tr
                             key={trainer.id}
                             onClick={() => openTrainerDashboard(trainer.id)}
@@ -828,7 +846,7 @@ export default function TrainersPage() {
                             <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                               <details className="group relative flex justify-end">
                                 <summary aria-label={`Actions for ${trainer.name}`} title="Trainer actions" className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-full border border-gray-200 text-xl leading-none text-gray-600 transition hover:border-[#800020] hover:bg-[#f9edf0] hover:text-[#800020] [&::-webkit-details-marker]:hidden">⋮</summary>
-                                <div className="absolute right-0 top-11 z-20 min-w-40 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
+                                <div className={`absolute right-0 z-20 min-w-40 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg ${index === filteredTrainers.length - 1 ? "bottom-11" : "top-11"}`}>
                                   <button onClick={() => openEditModal(trainer)} className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-[#f9edf0]">Edit</button>
                                   <button onClick={() => toggleStatus(trainer)} className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50">{trainer.status === "Active" ? "Deactivate" : "Activate"}</button>
                                   <button onClick={() => setDeleteTrainer(trainer)} className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50">Delete</button>
@@ -844,7 +862,7 @@ export default function TrainersPage() {
                   {/* MOBILE CARDS */}
 
                   <div className="grid grid-cols-1 gap-4 p-4 md:hidden">
-                    {filteredTrainers.map((trainer) => (
+                    {filteredTrainers.map((trainer, index) => (
                       <div
                         key={trainer.id}
                         onClick={() => openTrainerDashboard(trainer.id)}
@@ -939,7 +957,7 @@ export default function TrainersPage() {
                         <div className="mt-4 flex justify-end border-t border-gray-100 pt-3" onClick={(e) => e.stopPropagation()}>
                           <details className="group relative">
                             <summary aria-label={`Actions for ${trainer.name}`} title="Trainer actions" className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-full border border-gray-200 text-xl leading-none text-gray-600 transition hover:border-[#800020] hover:bg-[#f9edf0] hover:text-[#800020] [&::-webkit-details-marker]:hidden">⋮</summary>
-                            <div className="absolute right-0 top-11 z-20 min-w-40 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg">
+                            <div className={`absolute right-0 z-20 min-w-40 rounded-xl border border-gray-200 bg-white p-1.5 shadow-lg ${index === filteredTrainers.length - 1 ? "bottom-11" : "top-11"}`}>
                               <button onClick={() => openEditModal(trainer)} className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-[#f9edf0]">Edit</button>
                               <button onClick={() => toggleStatus(trainer)} className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-gray-700 hover:bg-gray-50">{trainer.status === "Active" ? "Deactivate" : "Activate"}</button>
                               <button onClick={() => setDeleteTrainer(trainer)} className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50">Delete</button>
@@ -1003,99 +1021,26 @@ export default function TrainersPage() {
               )}
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {/* NAME */}
-
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
-                    Full Name *
-                  </label>
-
-                  <input
-                    type="text"
-                    autoComplete="off"
-                    name="name"
-                    value={form.name}
-                    onChange={handleChange}
-                    required
-                    placeholder="Enter trainer name"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#800020]"
-                  />
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">Full Name *</label>
+                  <input type="text" autoComplete="off" name="name" value={form.name} onChange={handleChange} required placeholder="Enter trainer name" className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#800020]" />
                 </div>
-
-                {/* EMAIL */}
-
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
-                    Email Address *
-                  </label>
-
-                  <input
-                    type="email"
-                    autoComplete="off"
-                    name="email"
-                    value={form.email}
-                    onChange={handleChange}
-                    required
-                    placeholder="trainer@example.com"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#800020]"
-                  />
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">Email Address *</label>
+                  <input type="email" autoComplete="off" name="email" value={form.email} onChange={handleChange} required placeholder="trainer@example.com" className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#800020]" />
                 </div>
-
-                {/* PHONE */}
-
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
-                    Phone Number
-                  </label>
-
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    maxLength={15}
-                    autoComplete="tel"
-                    name="phone"
-                    value={form.phone}
-                    onChange={handleChange}
-                    placeholder="Enter phone number"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#800020]"
-                  />
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">Phone Number</label>
+                  <input type="tel" inputMode="numeric" maxLength={15} autoComplete="tel" name="phone" value={form.phone} onChange={handleChange} placeholder="Enter phone number" className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#800020]" />
                 </div>
-
-                {/* SPECIALIZATION */}
-
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
-                    Specialization
-                  </label>
-
-                  <input
-                    type="text"
-                    name="specialization"
-                    value={form.specialization}
-                    onChange={handleChange}
-                    placeholder="e.g. Weight Training"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#800020]"
-                  />
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">Specialization</label>
+                  <input type="text" name="specialization" value={form.specialization} onChange={handleChange} placeholder="e.g. Weight Training" className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#800020]" />
                 </div>
-
-                {/* EXPERIENCE */}
-
                 <div>
-                  <label className="mb-2 block text-sm font-semibold text-gray-700">
-                    Experience (Years)
-                  </label>
-
-                  <input
-                    type="number"
-                    name="experience"
-                    min="0"
-                    value={form.experience}
-                    onChange={handleChange}
-                    placeholder="e.g. 3 years"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#800020]"
-                  />
+                  <label className="mb-2 block text-sm font-semibold text-gray-700">Experience (Years)</label>
+                  <input type="number" name="experience" min="0" value={form.experience} onChange={handleChange} placeholder="e.g. 3 years" className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:border-[#800020]" />
                 </div>
-
                 {/* PASSWORD */}
 
                 <div>
