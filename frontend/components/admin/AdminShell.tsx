@@ -212,9 +212,9 @@ function AdminShellContent({ children }: { children: ReactNode }) {
     try {
      const { ok, data } = await adminApiFetch("/api/auth/me");
 
-console.log("AUTH API STATUS:", ok);
-console.log("AUTH API RESPONSE:", data);
-console.log("USER ROLE:", data?.user?.role);
+// console.log("AUTH API STATUS:", ok);
+// console.log("AUTH API RESPONSE:", data);
+// console.log("USER ROLE:", data?.user?.role);
 
 if (!ok || data?.user?.role?.toLowerCase() !== "admin") {
   clearAuth();

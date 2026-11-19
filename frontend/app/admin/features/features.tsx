@@ -15,24 +15,14 @@ interface Feature {
 export default function FeaturesPage() {
   const [features, setFeatures] = useState<Feature[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
   
 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingFeature, setEditingFeature] = useState<Feature | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    category: "facility" as Feature["category"],
-    status: "active" as Feature["status"],
-  });
 
   const loadFeatures = useCallback(async () => {
     setIsLoading(true);
@@ -69,51 +59,6 @@ export default function FeaturesPage() {
   const activeCount = features.filter(
     (feature) => feature.status === "active"
   ).length;
-
-  const openAddModal = () => {
-    setEditingFeature(null);
-    setFormData({
-      name: "",
-      description: "",
-      category: "facility",
-      status: "active",
-    });
-    setIsModalOpen(true);
-  };
-
-  const openEditModal = (feature: Feature) => {
-    setEditingFeature(feature);
-    setFormData({
-      name: feature.name,
-      description: feature.description,
-      category: feature.category,
-      status: feature.status,
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!formData.name.trim()) return;
-
-    setIsSaving(true);
-    setError("");
-    const result = await adminApiFetch(
-      editingFeature ? `/api/features/${editingFeature._id}` : "/api/features",
-      {
-        method: editingFeature ? "PUT" : "POST",
-        body: JSON.stringify({ ...formData, name: formData.name.trim() }),
-      }
-    );
-    setIsSaving(false);
-    if (!result.ok || !result.data?.success) {
-      setError(result.data?.message || "Could not save feature.");
-      return;
-    }
-    setIsModalOpen(false);
-    await loadFeatures();
-  };
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -318,131 +263,6 @@ export default function FeaturesPage() {
           </table>
         </div>
       </div>
-
-      {/* Add / Edit Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-xl border border-[#E9DDE0] bg-[#FFFFFF] p-6 shadow-xl">
-            <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-[#721D35]">
-                {editingFeature ? "Edit Feature" : "Add New Feature"}
-              </h2>
-
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="text-xl text-[#A18B90] hover:text-[#721D35]"
-              >
-                &times;
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-[#541629]">
-                  Feature Name *
-                </label>
-
-                <input
-                  type="text"
-                  required
-                  placeholder="Enter feature name"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      name: e.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-[#E9DDE0] bg-white px-4 py-2.5 text-sm outline-none focus:border-[#721D35] focus:ring-2 focus:ring-[#721D35]/10"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-[#541629]">
-                  Description
-                </label>
-
-                <textarea
-                  rows={3}
-                  placeholder="Enter feature description"
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      description: e.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border border-[#E9DDE0] bg-white px-4 py-2.5 text-sm outline-none focus:border-[#721D35] focus:ring-2 focus:ring-[#721D35]/10"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-[#541629]">
-                  Category
-                </label>
-
-                <select
-                  value={formData.category}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      category: e.target.value as Feature["category"],
-                    })
-                  }
-                  className="w-full rounded-lg border border-[#E9DDE0] bg-white px-4 py-2.5 text-sm outline-none focus:border-[#721D35]"
-                >
-                  <option value="equipment">Equipment</option>
-                  <option value="training">Training</option>
-                  <option value="facility">Facility</option>
-                  <option value="service">Service</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-[#541629]">
-                  Status
-                </label>
-
-                <select
-                  value={formData.status}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      status: e.target.value as Feature["status"],
-                    })
-                  }
-                  className="w-full rounded-lg border border-[#E9DDE0] bg-white px-4 py-2.5 text-sm outline-none focus:border-[#721D35]"
-                >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="rounded-lg border border-[#E9DDE0] px-5 py-2.5 text-sm font-medium text-[#866F74] hover:bg-[#F3E5E9]"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="rounded-lg bg-[#721D35] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#541629]"
-                >
-                  {isSaving
-                    ? "Saving..."
-                    : editingFeature
-                    ? "Update Feature"
-                    : "Save Feature"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Delete Confirmation */}
       {deleteId && (

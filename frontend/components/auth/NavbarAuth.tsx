@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -27,12 +26,7 @@ type View =
   | "rejected"
   | "member";
 
-type ModalName =
-  | "none"
-  | "register"
-  | "login"
-  | "pendingInfo"
-  | "rejectedInfo";
+type ModalName = "none" | "register" | "login" | "pendingInfo" | "rejectedInfo";
 
 type RequestStatus = "pending" | "active" | "rejected" | "gone" | "error";
 
@@ -133,7 +127,8 @@ export default function NavbarAuth() {
 
     async function init() {
       const session = getSession();
-      const currentMember = session && session.user.role.toLowerCase() !== "admin" ? session : null;
+      const currentMember =
+        session && session.user.role.toLowerCase() !== "admin" ? session : null;
 
       if (currentMember) {
         try {
@@ -246,11 +241,7 @@ export default function NavbarAuth() {
   }
 
   // Member/Trainer login success
-  function handleLoggedIn(
-    token: string,
-    user: MemberUser,
-    redirectTo: string
-  ) {
+  function handleLoggedIn(token: string, user: MemberUser, redirectTo: string) {
     const full = {
       ...user,
       dashboardPath: redirectTo,
@@ -293,8 +284,7 @@ export default function NavbarAuth() {
     setModal("register");
   }
 
-  const base =
-    "rounded-lg px-5 py-2.5 text-base font-semibold transition";
+  const base = "rounded-lg px-5 py-2.5 text-base font-semibold transition";
 
   let button: ReactNode;
 
@@ -430,16 +420,12 @@ export default function NavbarAuth() {
         />
 
         {modal === "pendingInfo" && (
-          <InfoModal
-            title="Request Pending"
-            onClose={() => setModal("none")}
-          >
+          <InfoModal title="Request Pending" onClose={() => setModal("none")}>
             <p>
-              Aap ki request admin ke paas pahunch gayi hai. Wo jald aap se
-              rabta karega.
+              Your request has reached the admin. They will contact you soon
             </p>
             <p className="mt-2">
-              Manzoor hote hi yahan "Log in" ka button aa jayega.
+              If request accepted then the login button show here
             </p>
             <button
               onClick={() => setModal("none")}
@@ -451,13 +437,10 @@ export default function NavbarAuth() {
         )}
 
         {modal === "rejectedInfo" && (
-          <InfoModal
-            title="Request Rejected"
-            onClose={() => setModal("none")}
-          >
+          <InfoModal title="Request Rejected" onClose={() => setModal("none")}>
             <p>
-              Aap ki request manzoor nahi hui. Zyada jaanne ke liye gym se
-              rabta karo, ya nayi request bhej do.
+              Your request has not been approved. To learn more, contact the gym
+              or submit a new request.
             </p>
 
             <div className="mt-5 flex gap-3">

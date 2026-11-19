@@ -389,6 +389,12 @@ export default function MembershipPage() {
 
           {/* CONTENT */}
 
+          {featuresError && (
+            <p role="alert" className="mb-4 text-sm text-red-600">
+              Could not load feature names: {featuresError}
+            </p>
+          )}
+
           {loading ? (
             <div className="flex items-center justify-center gap-3 rounded-2xl border border-[#E9DDE0] bg-white py-20 text-[#866F74]">
               <Loader2

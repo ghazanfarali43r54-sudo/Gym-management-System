@@ -1,15 +1,52 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { getMemberFitnessComparison } from "@/features/memberApi";
 
 type Props = { memberId: string; memberName: string };
-type Snapshot = { measurement: Record<string, any> | null; assessment: Record<string, any> | null };
+type MeasurementSnapshot = {
+  measuredAt?: string;
+  weight?: number;
+  weightUnit?: string;
+  height?: number;
+  measurementUnit?: string;
+  bmi?: number;
+  bodyFatPercentage?: number;
+  bodyFatMethod?: string;
+  muscleMass?: number;
+  chest?: number;
+  waist?: number;
+  hips?: number;
+  leftArm?: number;
+  rightArm?: number;
+  leftThigh?: number;
+  rightThigh?: number;
+  neck?: number;
+  notes?: string;
+  progressPhotos?: Partial<Record<"front" | "side" | "back", string>>;
+};
+type AssessmentSnapshot = {
+  assessmentDate?: string;
+  assessmentType?: string;
+  fitnessLevel?: string;
+  fitnessScore?: number;
+  strengthLevel?: string;
+  cardioLevel?: string;
+  flexibilityLevel?: string;
+  enduranceLevel?: string;
+  goals?: string[];
+  tests?: { testName: string; result: number; unit?: string }[];
+  physicalLimitations?: string;
+  observations?: string;
+  recommendations?: string;
+  nextAssessmentDate?: string | null;
+};
+type Snapshot = { measurement: MeasurementSnapshot | null; assessment: AssessmentSnapshot | null };
 type ProgressMetric = { label: string; status: string; message?: string; previous?: number; current?: number; difference?: number; unit?: string };
 type Comparison = { periods: { previous: string; current: string }; previous: Snapshot; current: Snapshot; report: ProgressMetric[] };
 type Detail = { label: string; value: string; href?: string };
 
-function formatDate(value?: string) {
+function formatDate(value?: string | null) {
   if (!value) return "Not recorded";
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "Not recorded" : date.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
@@ -20,7 +57,7 @@ function monthLabel(value?: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "Month" : date.toLocaleDateString(undefined, { month: "long", year: "numeric", timeZone: "UTC" });
 }
-
+  
 function detailsFor(snapshot: Snapshot): Detail[] {
   const m = snapshot.measurement;
   const a = snapshot.assessment;
@@ -44,7 +81,7 @@ function detailsFor(snapshot: Snapshot): Detail[] {
     { label: "Flexibility", value: a?.flexibilityLevel || "—" },
     { label: "Endurance", value: a?.enduranceLevel || "—" },
     { label: "Goals", value: Array.isArray(a?.goals) && a.goals.length ? a.goals.join(", ") : "—" },
-    { label: "Tests", value: Array.isArray(a?.tests) && a.tests.length ? a.tests.map((test: any) => `${test.testName}: ${test.result}${test.unit ? ` ${test.unit}` : ""}`).join("\n") : "—" },
+    { label: "Tests", value: Array.isArray(a?.tests) && a.tests.length ? a.tests.map((test) => `${test.testName}: ${test.result}${test.unit ? ` ${test.unit}` : ""}`).join("\n") : "—" },
     { label: "Physical limitations", value: a?.physicalLimitations || "—" },
     { label: "Observations", value: a?.observations || "—" },
     { label: "Recommendations", value: a?.recommendations || "—" },
@@ -97,12 +134,12 @@ export default function MemberFitnessComparison({ memberId, memberName }: Props)
 
   useEffect(() => {
     let active = true;
-    apiFetch(`/api/body-measurements/member/${encodeURIComponent(memberId)}/comparison`)
+    getMemberFitnessComparison(memberId)
       .then((response) => {
         if (!response.ok) throw new Error(response.data?.message || "Unable to calculate monthly progress.");
-        if (active) setData(response.data);
+        if (active) setData(response.data as Comparison);
       })
-      .catch((err) => { if (active) setError(err?.message || "Unable to calculate monthly progress."); })
+      .catch((err: unknown) => { if (active) setError(err instanceof Error ? err.message : "Unable to calculate monthly progress."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [memberId]);

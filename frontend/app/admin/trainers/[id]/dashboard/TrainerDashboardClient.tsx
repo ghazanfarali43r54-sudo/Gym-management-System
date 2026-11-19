@@ -4,16 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { API_URL } from "@/lib/api";
-import { getAdminSession, getTrainer } from "@/lib/memberAuth";
-
-/* =========================================================
-   TOKEN
-========================================================= */
-
-function getToken(): string {
-  const trainer = getTrainer() as { token?: string } | null;
-  return trainer?.token || "";
-}
+import { getAdminSession } from "@/lib/memberAuth";
 
 /* =========================================================
    TYPES
@@ -35,26 +26,6 @@ type Trainer = {
   memberLimit: number;
 };
 
-type Stats = {
-  members: number;
-  sessions: number;
-  rating: number;
-};
-
-type Permission = {
-  key: string;
-  label: string;
-  enabled: boolean;
-};
-
-type ActivityItem = {
-  id: string;
-  title: string;
-  module: string;
-  by: string;
-  createdAt: string;
-};
-
 type AssignedMember = {
   id: string;
   name: string;
@@ -66,10 +37,6 @@ type AssignedMember = {
 type ProfileData = {
   trainer: Trainer;
   account: Obj;
-  details: Obj;
-  stats: Stats;
-  permissions: Permission[];
-  activity: ActivityItem[];
   assignedMembers: AssignedMember[];
 };
 
@@ -92,72 +59,6 @@ function text(value: unknown, fallback = "—"): string {
 function num(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
-}
-
-function prettify(key: string): string {
-  const last = key.split(".").pop() || key;
-  return last
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/[_-]/g, " ")
-    .replace(/^./, (c) => c.toUpperCase());
-}
-
-function profileEntries(value: Obj, prefix = ""): Array<[string, string]> {
-  return Object.entries(value).flatMap(([key, item]) => {
-    if (key === "_id" || key === "__v" || key === "trainerId") return [];
-
-    const label = prefix ? `${prefix} ${prettify(key)}` : prettify(key);
-
-    if (item && typeof item === "object" && !Array.isArray(item)) {
-      const nested = obj(item);
-
-      if (
-        item instanceof Date ||
-        nested.name ||
-        nested.email ||
-        nested.city ||
-        nested.address ||
-        nested.phone ||
-        nested.isActive !== undefined
-      ) {
-        const reference = [
-          nested.name,
-          nested.email,
-          nested.city,
-          nested.address,
-          nested.phone,
-        ]
-          .filter((part) => part !== undefined && part !== "")
-          .map(String);
-
-        if (nested.isActive !== undefined) {
-          reference.push(nested.isActive ? "Active" : "Inactive");
-        }
-
-        return [[label, reference.join(" · ") || String(item)]];
-      }
-
-      return profileEntries(nested, label);
-    }
-
-    if (Array.isArray(item)) {
-      return [[label, item.map((entry) => text(entry)).join(", ") || "—"]];
-    }
-
-    if (item === null || item === undefined || item === "") {
-      return [[label, "—"]];
-    }
-
-    if (typeof item === "boolean") {
-      return [[label, item ? "Yes" : "No"]];
-    }
-
-    if (key === "createdAt" || key === "updatedAt" || key === "reviewedAt") {
-      return [[label, formatDateTime(String(item))]];
-    }
-
-    return [[label, String(item)]];
-  });
 }
 
 function formatDate(value: string): string {
@@ -191,23 +92,6 @@ function formatDateTime(value: string): string {
   return `${date} at ${time}`;
 }
 
-function timeAgo(value: string): string {
-  const diff = Date.now() - new Date(value).getTime();
-
-  if (!Number.isFinite(diff)) return "";
-
-  const minutes = Math.floor(diff / 60000);
-
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-
-  const hours = Math.floor(minutes / 60);
-
-  if (hours < 24) return `${hours}h ago`;
-
-  return `${Math.floor(hours / 24)}d ago`;
-}
-
 /* API response ko ek fixed shape me convert karta hai */
 function normalize(raw: unknown, fallbackId: string): ProfileData {
   const root = obj(raw);
@@ -219,43 +103,6 @@ function normalize(raw: unknown, fallbackId: string): ProfileData {
       t.trainerDetails ??
       t.trainerData
   );
-
-  const s = obj(root.stats);
-
-  const permsRaw = root.permissions ?? t.permissions ?? {};
-
-  const permissions: Permission[] = Array.isArray(permsRaw)
-    ? permsRaw.map((item) => {
-        const p = obj(item);
-        const key = text(p.key ?? p.name, "");
-
-        return {
-          key,
-          label: text(p.label, prettify(key)),
-          enabled: Boolean(p.enabled),
-        };
-      })
-    : Object.entries(obj(permsRaw)).map(([key, value]) => ({
-        key,
-        label: prettify(key),
-        enabled: Boolean(value),
-      }));
-
-  const activityRaw = root.activity ?? root.activityLog ?? [];
-
-  const activity: ActivityItem[] = Array.isArray(activityRaw)
-    ? activityRaw.map((item, i) => {
-        const a = obj(item);
-
-        return {
-          id: text(a.id ?? a._id, String(i)),
-          title: text(a.title ?? a.message, "Activity"),
-          module: text(a.module ?? a.type, "TRAINER MANAGEMENT"),
-          by: text(a.by ?? a.actor, "admin"),
-          createdAt: text(a.createdAt ?? a.date, ""),
-        };
-      })
-    : [];
 
   // Assigned members
   const membersRaw = root.assignedMembers ?? root.members ?? [];
@@ -321,16 +168,6 @@ function normalize(raw: unknown, fallbackId: string): ProfileData {
       })(),
     },
 
-    details: trainerDetails,
-
-    stats: {
-      members: num(s.members ?? s.assignedMembers ?? assignedMembers.length),
-      sessions: num(s.sessions ?? s.sessionsConducted),
-      rating: num(s.rating),
-    },
-
-    permissions,
-    activity,
     assignedMembers,
   };
 }
@@ -487,103 +324,6 @@ function Icon({
   );
 }
 
-/* =========================================================
-   SMALL UI PIECES
-========================================================= */
-
-function SectionTitle({
-  icon,
-  title,
-  right,
-}: {
-  icon: IconName;
-  title: string;
-  right?: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 border-b border-[#efe5dc] pb-4">
-      <div className="flex items-center gap-2.5">
-        <span className="h-4 w-1 rounded-full bg-[#7a1226]" />
-        <Icon name={icon} className="h-[18px] w-[18px] text-[#7a1226]" />
-        <h2 className="text-[13px] font-bold uppercase tracking-[0.14em] text-[#4a3a36]">
-          {title}
-        </h2>
-      </div>
-      {right}
-    </div>
-  );
-}
-
-function EditLink({ href }: { href: string }) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-[#4a3a36] transition hover:bg-[#f3ece4]"
-    >
-      <Icon name="pencil" className="h-4 w-4" />
-      Edit
-    </Link>
-  );
-}
-
-function InfoRow({
-  icon,
-  label,
-  value,
-}: {
-  icon: IconName;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f3ece4] text-stone-500">
-        <Icon name={icon} className="h-[18px] w-[18px]" />
-      </span>
-
-      <div className="min-w-0">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-400">
-          {label}
-        </p>
-        <p className="truncate text-sm font-bold text-[#2b0d13]">{value}</p>
-      </div>
-    </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  caption,
-  icon,
-}: {
-  label: string;
-  value: string;
-  caption: string;
-  icon: IconName;
-}) {
-  return (
-    <div className="rounded-2xl border border-[#e8dcd2] bg-[#fffdfa] p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3 border-b border-[#efe5dc] pb-3">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-stone-500">
-            {label}
-          </p>
-          <p className="mt-1 text-2xl font-extrabold tracking-tight text-[#2b0d13]">
-            {value}
-          </p>
-        </div>
-
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#f6e6e8] text-[#7a1226]">
-          <Icon name={icon} className="h-5 w-5" />
-        </span>
-      </div>
-
-      <p className="mt-3 text-xs font-medium text-stone-500">{caption}</p>
-    </div>
-  );
-}
-
 function Skeleton({ className = "" }: { className?: string }) {
   return (
     <div className={`animate-pulse rounded-2xl bg-[#efe5dc] ${className}`} />
@@ -600,7 +340,6 @@ export default function TrainerDashboardClient() {
 
   const [data, setData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -624,7 +363,6 @@ export default function TrainerDashboardClient() {
       } finally {
         if (active) {
           setLoading(false);
-          setRefreshing(false);
         }
       }
     }
@@ -639,11 +377,6 @@ export default function TrainerDashboardClient() {
       window.clearInterval(timer);
     };
   }, [id, reloadKey]);
-
-  function handleRefresh() {
-    setRefreshing(true);
-    setReloadKey((key) => key + 1);
-  }
 
   function handleRetry() {
     setError("");
@@ -713,13 +446,9 @@ export default function TrainerDashboardClient() {
 
   /* ---------- DATA ---------- */
 
-  const { trainer, stats, permissions, activity, assignedMembers } = data;
-  const details = data.details;
-
-  const enabledCount = permissions.filter((p) => p.enabled).length;
+  const { trainer, assignedMembers } = data;
   const initial = trainer.name.trim().charAt(0).toUpperCase() || "T";
 
-  const accessHref = `/admin/trainers/${trainer.id}/access`;
   const editHref = `/admin/trainers?view=edit&id=${encodeURIComponent(trainer.id)}`;
 
   // Show every assigned member. Add one empty slot only if capacity remains.

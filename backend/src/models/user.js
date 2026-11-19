@@ -92,7 +92,8 @@ const userSchema = new mongoose.Schema(
     },
     gender: {
       type: String,
-      enum: ["male", "female", "other"],
+      // Empty is valid because gender is optional on public registration.
+      enum: ["", "male", "female", "other"],
       default: "",
       trim: true,
     },

@@ -115,20 +115,6 @@ const MailIco = () => (
   </Ico>
 );
 
-const PinIco = () => (
-  <Ico>
-    <path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21Z" />
-    <circle cx="12" cy="9.5" r="2.5" />
-  </Ico>
-);
-
-const TagIco = () => (
-  <Ico>
-    <path d="M3 12V4h8l10 10-8 8L3 12Z" />
-    <circle cx="7.5" cy="8.5" r="1" />
-  </Ico>
-);
-
 /* ================= ACCEPT / REJECT POPUP ================= */
 
 function ActionModal({

@@ -1,7 +1,6 @@
+import axios, { type Method } from "axios";
+import axiosClient, { API_URL } from "./axios";
 import { clearSession, getSession } from "./memberAuth";
-
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
 
 export { API_URL };
 
@@ -35,32 +34,28 @@ async function request(
 ) {
   const token = role === "admin" ? getAdminToken() : getToken();
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
+  try {
+    const response = await axiosClient.request({
+      url: path,
+      method: (options.method || "GET") as Method,
+      data: options.body,
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
 
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+    return {
+      ok: true,
+      status: response.status,
+      data: response.data || {},
+    };
+  } catch (error: unknown) {
+    if (!axios.isAxiosError(error) || !error.response) throw error;
+
+    return {
+      ok: false,
+      status: error.response.status,
+      data: error.response.data || {},
+    };
   }
-
-  const response = await fetch(API_URL + path, {
-    method: options.method || "GET",
-    body: options.body,
-    headers,
-  });
-
-  const data = await response.json().catch(() => ({}));
-
-  if (response.status === 401 && typeof window !== "undefined") {
-    clearSession();
-    window.location.replace("/login");
-  }
-
-  return {
-    ok: response.ok,
-    status: response.status,
-    data,
-  };
 }
 
 // Automatically use the correct token for admin API routes

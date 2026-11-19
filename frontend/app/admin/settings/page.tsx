@@ -1085,7 +1085,6 @@ export default function SettingsPage() {
       await load();
     })();
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ================= NOTICE ================= */
@@ -1300,8 +1299,6 @@ export default function SettingsPage() {
 
   const dirty =
     isDirty(active);
-      const isCatalog = false;
-
   /* ================= UI ================= */
 
   return (

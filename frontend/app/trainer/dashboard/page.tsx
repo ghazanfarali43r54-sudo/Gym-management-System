@@ -299,14 +299,6 @@ const stats = [
   },
 ];
 
-const memberDistribution = [
-  { label: "Weight Loss", value: 32, color: "#7a1226" },
-  { label: "Strength Training", value: 24, color: "#a63446" },
-  { label: "Muscle Building", value: 20, color: "#c9606f" },
-  { label: "Cardio", value: 14, color: "#d9a0a8" },
-  { label: "General Fitness", value: 10, color: "#c2a27c" },
-];
-
 /* =========================================================
    PAGE
 ========================================================= */

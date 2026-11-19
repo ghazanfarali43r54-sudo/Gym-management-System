@@ -57,8 +57,9 @@ function validateRegistration(body) {
     errors.push("Enter a valid email");
   }
 
-  if (!/^[+\d()\s.-]+$/.test(data.phone) || data.phone.replace(/\D/g, "").length !== 11) {
-    errors.push("Enter an 11-digit phone number.");
+  const phoneDigitCount = data.phone.replace(/\D/g, "").length;
+  if (!/^[+\d()\s.-]+$/.test(data.phone) || phoneDigitCount < 7 || phoneDigitCount > 15) {
+    errors.push("Enter a phone number with 7 to 15 digits.");
   }
 
   if (data.password.length < 6 || data.password.length > 72) {

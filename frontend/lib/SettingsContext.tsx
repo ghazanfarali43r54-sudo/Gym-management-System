@@ -252,27 +252,6 @@ export function SettingsProvider({
   const calledByStorageRef = useRef(false);
 
   /**
-   * Local cached settings load karta hai.
-   * Ye sirf browser mein effect ke baad chalega.
-   */
-  const loadCachedSettings = useCallback(() => {
-    try {
-      const cached = localStorage.getItem(CACHE_KEY);
-
-      if (!cached) {
-        return;
-      }
-
-      const parsed = JSON.parse(cached);
-      const merged = mergeSettings(parsed);
-
-      setSettings(merged);
-    } catch {
-      // Invalid cache ignore karein
-    }
-  }, []);
-
-  /**
    * Backend se latest settings load karta hai.
    */
   const refresh = useCallback(async () => {

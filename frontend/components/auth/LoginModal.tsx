@@ -45,14 +45,6 @@ export default function LoginModal({
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
 
-  // Popup khule to form taza kar do
-const resetForm = () => {
-  setEmail(defaultEmail);
-  setPassword("");
-  setError("");
-  setShow(false);
-};
-
   // Esc se band ho, aur peeche ka page scroll na kare
   useEffect(() => {
     if (!open) return;

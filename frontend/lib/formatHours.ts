@@ -1,4 +1,4 @@
-import type { DayKey, Day } from "@/lib/SettingsContext";
+ import type { DayKey, Day } from "@/lib/SettingsContext";
 
 const DAYS: DayKey[] = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 const SHORT: Record<DayKey, string> = {

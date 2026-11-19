@@ -3,7 +3,9 @@ const Member = require("../models/Member");
 const TrainerData = require("../models/Trainer");
 const MembershipPlan = require("../models/membershipPlans");
 const BodyMeasurement = require("../models/BodyMeasurement");
+const FitnessAssessment = require("../models/FitnessAssessment");
 const { REQUEST_ROLES } = require("../utils/roles");
+const { validateAdminMember } = require("../utils/validateAdminMember");
 
 const OBJECT_ID = /^[a-f\d]{24}$/i;
 const STATUSES = ["pending", "active", "rejected"];
@@ -74,64 +76,23 @@ exports.createMember = async (req, res) => {
       photo = "",
     } = req.body || {};
 
+    const validationErrors = validateAdminMember(req.body || {});
+    if (Object.keys(validationErrors).length) {
+      return res.status(422).json({ message: "Validation failed", errors: validationErrors });
+    }
+
     const cleanName = typeof name === "string" ? name.trim() : "";
     const cleanEmail =
       typeof email === "string" ? email.trim().toLowerCase() : "";
     const cleanPhone = typeof phone === "string" ? phone.trim() : "";
 
-    if (!/^(?=.{2,80}$)[\p{L}]+(?:[ '\u2019-][\p{L}]+)*$/u.test(cleanName)) {
-      return res.status(400).json({
-        message: "Enter a valid name using letters, spaces, apostrophes, or hyphens.",
-      });
-    }
-
-    if (!/^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$/i.test(cleanEmail) || cleanEmail.length > 100) {
-      return res.status(400).json({
-        message: "Enter a valid email",
-      });
-    }
-
-    if (!/^[+\d()\s.-]+$/.test(cleanPhone) || cleanPhone.replace(/\D/g, "").length !== 11) {
-      return res.status(400).json({
-        message: "Enter an 11-digit phone number.",
-      });
-    }
-
-    if (
-      typeof password !== "string" ||
-      password.length < 6 ||
-      password.length > 72
-    ) {
-      return res.status(400).json({
-        message: "Password must be 6 to 72 characters",
-      });
-    }
-
-    if (typeof photo !== "string" || (photo && (!photo.startsWith("data:image/jpeg;base64,") || photo.length > 150000))) {
-      return res.status(400).json({ message: "Photo must be a valid JPEG image." });
-    }
-
     const memberStatus =
       status === undefined ? "active" : String(status).toLowerCase();
-
-    if (!["pending", "active", "inactive"].includes(memberStatus)) {
-      return res.status(400).json({
-        message: "Invalid member status",
-      });
-    }
-
-    if (assignedTrainerId && !OBJECT_ID.test(String(assignedTrainerId))) {
-      return res.status(400).json({ message: "Invalid trainer" });
-    }
-
-    if (!Array.isArray(membershipPlanIds) || membershipPlanIds.length > 20 || membershipPlanIds.some((id) => !OBJECT_ID.test(String(id))) || new Set(membershipPlanIds.map(String)).size !== membershipPlanIds.length) {
-      return res.status(400).json({ message: "Select valid membership plans." });
-    }
     const activePlans = membershipPlanIds.length
       ? await MembershipPlan.find({ _id: { $in: membershipPlanIds }, status: "active" }).select("_id").lean()
       : [];
     if (activePlans.length !== membershipPlanIds.length) {
-      return res.status(400).json({ message: "One or more selected membership plans are unavailable." });
+      return res.status(422).json({ message: "Validation failed", errors: { membershipPlanIds: "One or more selected membership plans are unavailable." } });
     }
 
     const [existing, trainer] = await Promise.all([
@@ -147,14 +108,16 @@ exports.createMember = async (req, res) => {
     ]);
 
     if (assignedTrainerId && !trainer) {
-      return res.status(400).json({
-        message: "Selected trainer is not available",
+      return res.status(422).json({
+        message: "Validation failed",
+        errors: { assignedTrainerId: "Selected trainer is not available." },
       });
     }
 
     if (existing) {
       return res.status(409).json({
-        message: "This email is already in use",
+        message: "Validation failed",
+        errors: { email: "This email is already in use." },
       });
     }
 
@@ -167,8 +130,9 @@ exports.createMember = async (req, res) => {
       const memberLimit = Number(trainerData?.memberLimit ?? 20);
 
       if (assignedCount >= memberLimit) {
-        return res.status(400).json({
-          message: `Selected trainer has reached the ${memberLimit}-member limit`,
+        return res.status(422).json({
+          message: "Validation failed",
+          errors: { assignedTrainerId: `Selected trainer has reached the ${memberLimit}-member limit.` },
         });
       }
     }
@@ -210,15 +174,22 @@ exports.createMember = async (req, res) => {
 
     if (err.code === 11000) {
       return res.status(409).json({
-        message: "This email is already in use",
+        message: "Validation failed",
+        errors: { email: "This email is already in use." },
       });
     }
 
     if (err.name === "ValidationError") {
-      return res.status(400).json({
-        message: Object.values(err.errors)
-          .map((error) => error.message)
-          .join(", "),
+      const errors = Object.fromEntries(
+        Object.entries(err.errors).map(([field, error]) => [field, error.message])
+      );
+      return res.status(422).json({ message: "Validation failed", errors });
+    }
+
+    if (err.name === "CastError") {
+      return res.status(422).json({
+        message: "Validation failed",
+        errors: { [err.path]: `Invalid value for ${err.path}.` },
       });
     }
 
@@ -496,6 +467,7 @@ exports.updateRequest = async (req, res) => {
       name,
       email,
       phone,
+      password,
       status,
       assignedTrainerId,
       dateOfBirth,
@@ -506,52 +478,33 @@ exports.updateRequest = async (req, res) => {
       photo,
     } = req.body || {};
 
+    const validationErrors = validateAdminMember(req.body || {}, { partial: true });
+    if (Object.keys(validationErrors).length) {
+      return res.status(422).json({ message: "Validation failed", errors: validationErrors });
+    }
+
     // Update User fields.
     if (name !== undefined) {
       const cleanName = String(name).trim();
-
-      if (!/^(?=.{2,80}$)[\p{L}]+(?:[ '\u2019-][\p{L}]+)*$/u.test(cleanName)) {
-        return res.status(400).json({
-          message: "Enter a valid name using letters, spaces, apostrophes, or hyphens.",
-        });
-      }
-
       user.name = cleanName;
     }
 
     if (email !== undefined) {
       const cleanEmail = String(email).trim().toLowerCase();
-
-      if (!/^[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$/i.test(cleanEmail) || cleanEmail.length > 100) {
-        return res.status(400).json({
-          message: "Enter a valid email",
-        });
-      }
-
       user.email = cleanEmail;
     }
 
     if (phone !== undefined) {
       const cleanPhone = String(phone).trim();
-
-      if (!/^[+\d()\s.-]+$/.test(cleanPhone) || cleanPhone.replace(/\D/g, "").length !== 11) {
-        return res.status(400).json({
-          message: "Enter an 11-digit phone number.",
-        });
-      }
-
       user.phone = cleanPhone;
     }
+    if (password !== undefined && password !== "") {
+      user.password = password;
+    }
     if (photo !== undefined) {
-      if (typeof photo !== "string" || (photo && (!photo.startsWith("data:image/jpeg;base64,") || photo.length > 150000))) {
-        return res.status(400).json({ message: "Photo must be a valid JPEG image no larger than 2 MB." });
-      }
       user.photo = photo;
     }
     if (membershipPlanIds !== undefined) {
-      if (!Array.isArray(membershipPlanIds) || membershipPlanIds.length > 20 || membershipPlanIds.some((id) => !OBJECT_ID.test(String(id))) || new Set(membershipPlanIds.map(String)).size !== membershipPlanIds.length) {
-        return res.status(400).json({ message: "Select valid membership plans." });
-      }
       const existingPlanIds = new Set((profile.membershipPlans || []).map(String));
       const eligiblePlans = membershipPlanIds.length
         ? await MembershipPlan.find({
@@ -560,22 +513,18 @@ exports.updateRequest = async (req, res) => {
           }).select("_id").lean()
         : [];
       if (eligiblePlans.length !== membershipPlanIds.length) {
-        return res.status(400).json({ message: "One or more selected membership plans are unavailable." });
+        return res.status(422).json({ message: "Validation failed", errors: { membershipPlanIds: "One or more selected membership plans are unavailable." } });
       }
       profile.membershipPlans = membershipPlanIds;
     }
     //!validation
-    if (gender !== undefined) {
-      if (gender && !["male", "female", "other"].includes(String(gender).toLowerCase())) {
-        return res.status(400).json({ message: "Select a valid gender" });
-      }
+    // The member edit form may submit an empty value when gender is not selected.
+    // Do not write that value: `gender` only accepts the declared enum values.
+    if (gender !== undefined && String(gender).trim() !== "") {
       user.gender = String(gender).toLowerCase();
     }
     if (dateOfBirth !== undefined) {
       const parsedDate = dateOfBirth ? new Date(dateOfBirth) : null;
-      if (dateOfBirth && (Number.isNaN(parsedDate.getTime()) || parsedDate > new Date())) {
-        return res.status(400).json({ message: "Enter a valid date of birth" });
-      }
       user.dateOfBirth = parsedDate;
     }
     //!validation
@@ -588,10 +537,6 @@ exports.updateRequest = async (req, res) => {
 
     // Update trainer assignment in MemberData.
     if (assignedTrainerId !== undefined) {
-      if (assignedTrainerId && !OBJECT_ID.test(String(assignedTrainerId))) {
-        return res.status(400).json({ message: "Invalid trainer" });
-      }
-
       const isCurrentAssignment =
         assignedTrainerId &&
         String(profile.assignedTrainer || "") === String(assignedTrainerId);
@@ -605,8 +550,9 @@ exports.updateRequest = async (req, res) => {
         : null;
 
       if (assignedTrainerId && !trainer) {
-        return res.status(400).json({
-          message: "Selected trainer is not available",
+        return res.status(422).json({
+          message: "Validation failed",
+          errors: { assignedTrainerId: "Selected trainer is not available." },
         });
       }
 
@@ -626,8 +572,9 @@ exports.updateRequest = async (req, res) => {
         const memberLimit = Number(trainerData?.memberLimit ?? 20);
 
         if (assignedCount >= memberLimit) {
-          return res.status(400).json({
-            message: `Selected trainer has reached the ${memberLimit}-member limit`,
+          return res.status(422).json({
+            message: "Validation failed",
+            errors: { assignedTrainerId: `Selected trainer has reached the ${memberLimit}-member limit.` },
           });
         }
       }
@@ -638,13 +585,6 @@ exports.updateRequest = async (req, res) => {
     // Status belongs to User, not MemberData.
     if (status !== undefined) {
       const newStatus = String(status).toLowerCase();
-
-      if (!["active", "inactive", "pending", "rejected"].includes(newStatus)) {
-        return res.status(400).json({
-          message: "Invalid member status",
-        });
-      }
-
       user.status = newStatus;
     }
 
@@ -680,22 +620,23 @@ exports.updateRequest = async (req, res) => {
     console.log("Update request error:", err.message);
 
     if (err.name === "ValidationError") {
-      return res.status(400).json({
-        message: Object.values(err.errors)
-          .map((e) => e.message)
-          .join(", "),
-      });
+      const errors = Object.fromEntries(
+        Object.entries(err.errors).map(([field, error]) => [field, error.message])
+      );
+      return res.status(422).json({ message: "Validation failed", errors });
     }
 
     if (err.name === "CastError") {
-      return res.status(400).json({
-        message: `Invalid value for ${err.path}`,
+      return res.status(422).json({
+        message: "Validation failed",
+        errors: { [err.path]: `Invalid value for ${err.path}.` },
       });
     }
 
     if (err.code === 11000) {
       return res.status(409).json({
-        message: "A member with this email already exists",
+        message: "Validation failed",
+        errors: { email: "A member with this email already exists." },
       });
     }
 
@@ -720,16 +661,14 @@ exports.deleteRequest = async (req, res) => {
       return res.status(404).json({ message: "Member not found" });
     }
 
-    // Soft delete user
-    await User.updateOne(
-      { _id: user._id },
-      {
-        $set: {
-          isDeleted: true,
-          deletedAt: new Date(),
-        },
-      }
-    );
+    // Remove records owned by this member before removing the account.
+    await Promise.all([
+      Member.deleteMany({ memberId: user._id }),
+      BodyMeasurement.deleteMany({ memberId: user._id }),
+      FitnessAssessment.deleteMany({ memberId: user._id }),
+    ]);
+
+    await User.deleteOne({ _id: user._id, role: "member" });
 
     return res.json({ message: "Member deleted successfully" });
   } catch (err) {

@@ -1,17 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { API_URL } from "../../../lib/api";
+import { getMemberDashboard } from "@/features/memberApi";
 import { useSettings } from "@/lib/SettingsContext";
 import {
   getMember,
   clearMember,
   type MemberUser,
-} from "../../../lib/memberAuth";
-
- 
-
- 
+} from "@/lib/memberAuth";
 
 type DashboardUser = MemberUser & {
   phone?: string;
@@ -43,22 +39,14 @@ export default function MemberDashboard() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/auth/me`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${session.token}`,
-          "Content-Type": "application/json",
-        },
-        cache: "no-store",
-      });
-
-      const result: ApiResponse = await response.json();
-
+      const response = await getMemberDashboard();
       if (response.status === 401) {
         clearMember();
         window.location.replace("/login");
         return;
       }
+
+      const result = response.data as ApiResponse;
 
       if (!response.ok) {
         throw new Error(result.message || "Unable to load dashboard");
