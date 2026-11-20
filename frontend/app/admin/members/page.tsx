@@ -21,6 +21,12 @@ function MembersPageContent() {
         <MemberDetails
           member={selectedMember}
           onEdit={() => memberPage.openEditModal(selectedMember)}
+          onOpenFitnessEntry={(type) =>
+            memberPage.openFitnessEntry(selectedMember, type)
+          }
+          onEditFitnessEntry={(type, recordId) =>
+            memberPage.openFitnessEntry(selectedMember, type, recordId)
+          }
         />
       ) : (
         <MemberList
@@ -75,4 +81,4 @@ export default function MembersPage() {
   );
 }
 
-export { FitnessEntryPageContent }; 
+export { FitnessEntryPageContent };

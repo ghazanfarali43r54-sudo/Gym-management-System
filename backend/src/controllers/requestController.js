@@ -6,6 +6,27 @@ const BodyMeasurement = require("../models/BodyMeasurement");
 const FitnessAssessment = require("../models/FitnessAssessment");
 const { REQUEST_ROLES } = require("../utils/roles");
 const { validateAdminMember } = require("../utils/validateAdminMember");
+const {
+  uploadToCloudinary,
+  deleteFromCloudinary,
+} = require("../utils/cloudinaryUpload");
+
+// Convert JSON strings received through FormData into JavaScript values.
+const parseAdminMemberBody = (body = {}) => {
+  const parsed = { ...body };
+
+  for (const key of ["address", "emergencyContact", "membershipPlanIds"]) {
+    if (typeof parsed[key] === "string") {
+      try {
+        parsed[key] = JSON.parse(parsed[key]);
+      } catch {
+        return { data: null, error: key };
+      }
+    }
+  }
+
+  return { data: parsed, error: null };
+};
 
 const OBJECT_ID = /^[a-f\d]{24}$/i;
 const STATUSES = ["pending", "active", "rejected"];
@@ -40,7 +61,11 @@ function toRequest(user, profile = {}) {
     gender: user.gender || "",
     dateOfBirth: user.dateOfBirth || null,
     address: profile.address || { street: "", city: "", country: "" },
-    emergencyContact: profile.emergencyContact || { name: "", relationship: "", phone: "" },
+    emergencyContact: profile.emergencyContact || {
+      name: "",
+      relationship: "",
+      phone: "",
+    },
 
     assignedTrainer: profile.assignedTrainer || null,
     membershipPlans: profile.membershipPlans || [],
@@ -59,8 +84,18 @@ function toRequest(user, profile = {}) {
 // Create a member directly from admin panel.
 exports.createMember = async (req, res) => {
   let createdUser = null;
+  let uploadedPhoto = null;
 
   try {
+    const { data, error } = parseAdminMemberBody(req.body || {});
+
+    if (error) {
+      return res.status(422).json({
+        message: "Validation failed",
+        errors: { [error]: `Invalid ${error} data.` },
+      });
+    }
+
     const {
       name,
       email,
@@ -73,12 +108,13 @@ exports.createMember = async (req, res) => {
       dateOfBirth,
       gender,
       membershipPlanIds = [],
-      photo = "",
-    } = req.body || {};
+    } = data;
 
-    const validationErrors = validateAdminMember(req.body || {});
+    const validationErrors = validateAdminMember(data);
     if (Object.keys(validationErrors).length) {
-      return res.status(422).json({ message: "Validation failed", errors: validationErrors });
+      return res
+        .status(422)
+        .json({ message: "Validation failed", errors: validationErrors });
     }
 
     const cleanName = typeof name === "string" ? name.trim() : "";
@@ -89,10 +125,21 @@ exports.createMember = async (req, res) => {
     const memberStatus =
       status === undefined ? "active" : String(status).toLowerCase();
     const activePlans = membershipPlanIds.length
-      ? await MembershipPlan.find({ _id: { $in: membershipPlanIds }, status: "active" }).select("_id").lean()
+      ? await MembershipPlan.find({
+          _id: { $in: membershipPlanIds },
+          status: "active",
+        })
+          .select("_id")
+          .lean()
       : [];
     if (activePlans.length !== membershipPlanIds.length) {
-      return res.status(422).json({ message: "Validation failed", errors: { membershipPlanIds: "One or more selected membership plans are unavailable." } });
+      return res.status(422).json({
+        message: "Validation failed",
+        errors: {
+          membershipPlanIds:
+            "One or more selected membership plans are unavailable.",
+        },
+      });
     }
 
     const [existing, trainer] = await Promise.all([
@@ -132,11 +179,17 @@ exports.createMember = async (req, res) => {
       if (assignedCount >= memberLimit) {
         return res.status(422).json({
           message: "Validation failed",
-          errors: { assignedTrainerId: `Selected trainer has reached the ${memberLimit}-member limit.` },
+          errors: {
+            assignedTrainerId: `Selected trainer has reached the ${memberLimit}-member limit.`,
+          },
         });
       }
     }
- 
+
+    // Upload the selected profile photo to Cloudinary.
+    if (req.file) {
+      uploadedPhoto = await uploadToCloudinary(req.file.buffer);
+    }
     // Create authentication record.
     createdUser = await User.create({
       name: cleanName,
@@ -147,19 +200,19 @@ exports.createMember = async (req, res) => {
       status: memberStatus,
       ...(gender && { gender }),
       ...(dateOfBirth && { dateOfBirth }),
-      ...(photo && { photo }),
-       
+      ...(uploadedPhoto && {
+        photo: uploadedPhoto.url,
+        photoPublicId: uploadedPhoto.publicId,
+      }),
     });
-
     // Create member profile separately.
     const memberProfile = await Member.create({
       memberId: createdUser._id,
 
       assignedTrainer: trainer?._id || null,
       membershipPlans: membershipPlanIds,
-      emergencyContact:emergencyContact,
-      address:address
-
+      emergencyContact: emergencyContact,
+      address: address,
     });
 
     return res.status(201).json({
@@ -172,6 +225,11 @@ exports.createMember = async (req, res) => {
       await User.deleteOne({ _id: createdUser._id }).catch(() => {});
     }
 
+    // Delete uploaded photo if member creation fails.
+    if (uploadedPhoto?.publicId) {
+      await deleteFromCloudinary(uploadedPhoto.publicId).catch(() => {});
+    }
+
     if (err.code === 11000) {
       return res.status(409).json({
         message: "Validation failed",
@@ -181,7 +239,10 @@ exports.createMember = async (req, res) => {
 
     if (err.name === "ValidationError") {
       const errors = Object.fromEntries(
-        Object.entries(err.errors).map(([field, error]) => [field, error.message])
+        Object.entries(err.errors).map(([field, error]) => [
+          field,
+          error.message,
+        ])
       );
       return res.status(422).json({ message: "Validation failed", errors });
     }
@@ -253,10 +314,10 @@ exports.listRequests = async (req, res) => {
     // Fetch member profiles.
     const [memberProfiles, measurementCounts] = await Promise.all([
       Member.find({ memberId: { $in: memberIds } })
-      //!when i want to add brainhes then i just uncument this & update admintrainerdashboard function..below:
-      .populate("assignedTrainer", "name email phone photo")
-      .populate("membershipPlans", "name price status")
-      .lean(),
+        //!when i want to add brainhes then i just uncument this & update admintrainerdashboard function..below:
+        .populate("assignedTrainer", "name email phone photo")
+        .populate("membershipPlans", "name price status")
+        .lean(),
       BodyMeasurement.aggregate([
         { $match: { memberId: { $in: memberIds } } },
         { $group: { _id: "$memberId", count: { $sum: 1 } } },
@@ -439,6 +500,9 @@ exports.rejectRequest = async (req, res) => {
 
 // PATCH /api/admin/requests/:id
 exports.updateRequest = async (req, res) => {
+  let uploadedPhoto = null;
+  let databaseUpdated = false;
+
   try {
     if (!OBJECT_ID.test(String(req.params.id))) {
       return res.status(404).json({ message: "Member not found" });
@@ -463,6 +527,15 @@ exports.updateRequest = async (req, res) => {
       });
     }
 
+    const { data, error } = parseAdminMemberBody(req.body || {});
+
+    if (error) {
+      return res.status(422).json({
+        message: "Validation failed",
+        errors: { [error]: `Invalid ${error} data.` },
+      });
+    }
+
     const {
       name,
       email,
@@ -475,12 +548,12 @@ exports.updateRequest = async (req, res) => {
       address,
       emergencyContact,
       membershipPlanIds,
-      photo,
-    } = req.body || {};
-
-    const validationErrors = validateAdminMember(req.body || {}, { partial: true });
+    } = data;
+    const validationErrors = validateAdminMember(data, { partial: true });
     if (Object.keys(validationErrors).length) {
-      return res.status(422).json({ message: "Validation failed", errors: validationErrors });
+      return res
+        .status(422)
+        .json({ message: "Validation failed", errors: validationErrors });
     }
 
     // Update User fields.
@@ -501,19 +574,42 @@ exports.updateRequest = async (req, res) => {
     if (password !== undefined && password !== "") {
       user.password = password;
     }
-    if (photo !== undefined) {
-      user.photo = photo;
+    // Keep the old Cloudinary ID so we can delete it after a successful update.
+    const oldPhotoPublicId = user.photoPublicId;
+
+    // Upload a new photo if one was selected.
+    if (req.file) {
+      uploadedPhoto = await uploadToCloudinary(req.file.buffer);
+
+      user.photo = uploadedPhoto.url;
+      user.photoPublicId = uploadedPhoto.publicId;
+    }
+
+    // Remove the existing photo if removal was requested.
+    else if (req.body.removePhoto === "true") {
+      user.photo = "";
+      user.photoPublicId = "";
     }
     if (membershipPlanIds !== undefined) {
-      const existingPlanIds = new Set((profile.membershipPlans || []).map(String));
+      const existingPlanIds = new Set(
+        (profile.membershipPlans || []).map(String)
+      );
       const eligiblePlans = membershipPlanIds.length
         ? await MembershipPlan.find({
             _id: { $in: membershipPlanIds },
             $or: [{ status: "active" }, { _id: { $in: [...existingPlanIds] } }],
-          }).select("_id").lean()
+          })
+            .select("_id")
+            .lean()
         : [];
       if (eligiblePlans.length !== membershipPlanIds.length) {
-        return res.status(422).json({ message: "Validation failed", errors: { membershipPlanIds: "One or more selected membership plans are unavailable." } });
+        return res.status(422).json({
+          message: "Validation failed",
+          errors: {
+            membershipPlanIds:
+              "One or more selected membership plans are unavailable.",
+          },
+        });
       }
       profile.membershipPlans = membershipPlanIds;
     }
@@ -574,7 +670,9 @@ exports.updateRequest = async (req, res) => {
         if (assignedCount >= memberLimit) {
           return res.status(422).json({
             message: "Validation failed",
-            errors: { assignedTrainerId: `Selected trainer has reached the ${memberLimit}-member limit.` },
+            errors: {
+              assignedTrainerId: `Selected trainer has reached the ${memberLimit}-member limit.`,
+            },
           });
         }
       }
@@ -589,6 +687,7 @@ exports.updateRequest = async (req, res) => {
     }
 
     await Promise.all([user.save(), profile.save()]);
+    databaseUpdated = true;
 
     //update member data
     await Member.findOneAndUpdate(
@@ -612,16 +711,29 @@ exports.updateRequest = async (req, res) => {
       .populate("membershipPlans", "name price status")
       .lean();
 
+    // Delete the old photo after the database update succeeds.
+    if (oldPhotoPublicId && oldPhotoPublicId !== user.photoPublicId) {
+      await deleteFromCloudinary(oldPhotoPublicId).catch(() => {});
+    }
+
     return res.json({
       message: "Member updated",
       request: toRequest(user, updatedProfile || {}),
     });
   } catch (err) {
+    // Remove the new photo if the database update did not succeed.
+    if (!databaseUpdated && uploadedPhoto?.publicId) {
+      await deleteFromCloudinary(uploadedPhoto.publicId).catch(() => {});
+    }
+
     console.log("Update request error:", err.message);
 
     if (err.name === "ValidationError") {
       const errors = Object.fromEntries(
-        Object.entries(err.errors).map(([field, error]) => [field, error.message])
+        Object.entries(err.errors).map(([field, error]) => [
+          field,
+          error.message,
+        ])
       );
       return res.status(422).json({ message: "Validation failed", errors });
     }

@@ -15,8 +15,9 @@ export function getAdminToken(): string | null {
   return session?.user.role.toLowerCase() === "admin" ? session.token : null;
 }
 
-// Admin logout only
-export function clearAuth(): void {
+
+// Clear the current admin session
+export function clearAdminSession(): void {
   if (typeof window === "undefined") return;
 
   clearSession();

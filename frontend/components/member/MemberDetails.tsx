@@ -4,9 +4,19 @@ import { statusClass, type Member } from "@/features/memberApi";
 type MemberDetailsProps = {
   member: Member;
   onEdit: () => void;
+  onOpenFitnessEntry: (type: "body-measurement" | "fitness-assessment") => void;
+  onEditFitnessEntry: (
+    type: "body-measurement" | "fitness-assessment",
+    recordId: string
+  ) => void;
 };
 
-export default function MemberDetails({ member, onEdit }: MemberDetailsProps) {
+export default function MemberDetails({
+  member,
+  onEdit,
+  onOpenFitnessEntry,
+  onEditFitnessEntry,
+}: MemberDetailsProps) {
   const initials = member.name
     .trim()
     .split(/\s+/)
@@ -156,12 +166,23 @@ export default function MemberDetails({ member, onEdit }: MemberDetailsProps) {
       </div>
 
       {member.status === "Active" ? (
-        <MemberFitnessRecords memberId={member.id} />
+        <MemberFitnessRecords
+          memberId={member.id}
+          onAdd={(tab) =>
+            onOpenFitnessEntry(
+              tab === "measurements" ? "body-measurement" : "fitness-assessment"
+            )
+          }
+          onEdit={(type, recordId) => onEditFitnessEntry(type, recordId)}
+        />
       ) : (
         <section className="rounded-2xl border border-[#eadfd9] bg-white p-5 shadow-sm">
-          <h2 className="font-bold text-[#4b1725]">Fitness records unavailable</h2>
+          <h2 className="font-bold text-[#4b1725]">
+            Fitness records unavailable
+          </h2>
           <p className="mt-1 text-sm text-[#8b7771]">
-            Fitness records are available after this membership request is approved.
+            Fitness records are available after this membership request is
+            approved.
           </p>
         </section>
       )}

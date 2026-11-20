@@ -3,7 +3,7 @@ import { useSettings } from "@/lib/SettingsContext";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState, type ReactNode } from "react";
-import { adminApiFetch, clearAuth, getAdminToken } from "@/lib/api";
+import { adminApiFetch, clearAdminSession, getAdminToken } from "@/lib/api";
 
 /* ================= ICONS ================= */
 
@@ -29,7 +29,7 @@ const paths = {
       <circle cx="7.5" cy="8.5" r="1" />
     </>
   ),
-  
+
   attendance: (
     <>
       <circle cx="12" cy="12" r="9" />
@@ -85,7 +85,9 @@ const paths = {
   chevRight: <path d="m9 6 6 6-6 6" />,
   collapse: <path d="m11 7-5 5 5 5M18 7l-5 5 5 5" />,
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
-  logout: <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 8l-4 4 4 4M6 12h11" />,
+  logout: (
+    <path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 8l-4 4 4 4M6 12h11" />
+  ),
   building: (
     <path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16M16 9h2a2 2 0 0 1 2 2v10M3 21h18M8 7h4M8 11h4M8 15h4" />
   ),
@@ -106,7 +108,13 @@ const paths = {
 
 export type IconName = keyof typeof paths;
 
-export function Icon({ name, className = "h-5 w-5" }: { name: IconName; className?: string }) {
+export function Icon({
+  name,
+  className = "h-5 w-5",
+}: {
+  name: IconName;
+  className?: string;
+}) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -125,10 +133,15 @@ export function Icon({ name, className = "h-5 w-5" }: { name: IconName; classNam
 
 /* ================= SIDEBAR LINKS ================= */
 
-const nav: { group: string; items: { label: string; href: string; icon: IconName }[] }[] = [
+const nav: {
+  group: string;
+  items: { label: string; href: string; icon: IconName }[];
+}[] = [
   {
     group: "Overview",
-    items: [{ label: "Dashboard", href: "/admin/dashboard", icon: "dashboard" }],
+    items: [
+      { label: "Dashboard", href: "/admin/dashboard", icon: "dashboard" },
+    ],
   },
   {
     group: "Members",
@@ -155,7 +168,7 @@ const nav: { group: string; items: { label: string; href: string; icon: IconName
       { label: "Reports", href: "/admin/reports", icon: "reports" },
     ],
   },
-   
+
   {
     group: "System",
     items: [{ label: "Settings", href: "/admin/settings", icon: "settings" }],
@@ -204,26 +217,25 @@ function AdminShellContent({ children }: { children: ReactNode }) {
     setChecking(true);
     setConnectError(false);
 
-  if (!getAdminToken()) {
+    if (!getAdminToken()) {
       router.replace("/login");
       return;
     }
 
     try {
-     const { ok, data } = await adminApiFetch("/api/auth/me");
+      const { ok, data } = await adminApiFetch("/api/auth/me");
+      if (!ok && data?.status === 401) {
+        return;
+      }
 
-// console.log("AUTH API STATUS:", ok);
-// console.log("AUTH API RESPONSE:", data);
-// console.log("USER ROLE:", data?.user?.role);
+      if (!ok || data?.user?.role?.toLowerCase() !== "admin") {
+        clearAdminSession();
+        router.replace("/login");
+        return;
+      }
 
-if (!ok || data?.user?.role?.toLowerCase() !== "admin") {
-  clearAuth();
-  router.replace("/login");
-  return;
-}
-
- setUser(data.user);
- setChecking(false);
+      setUser(data.user);
+      setChecking(false);
     } catch {
       setConnectError(true);
       setChecking(false);
@@ -235,7 +247,7 @@ if (!ok || data?.user?.role?.toLowerCase() !== "admin") {
   }, []);
 
   function logout() {
-    clearAuth();
+    clearAdminSession();
     router.replace("/login");
   }
 
@@ -259,8 +271,13 @@ if (!ok || data?.user?.role?.toLowerCase() !== "admin") {
           <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#800020]/10 text-[#800020]">
             <Icon name="alert" />
           </span>
-          <h2 className="text-lg font-bold text-[#800020]"> Server cannot connected </h2>
-          <p className="mt-2 text-sm text-[#800020]/65">Check Backend is running,And  try again.</p>
+          <h2 className="text-lg font-bold text-[#800020]">
+            {" "}
+            Server cannot connected{" "}
+          </h2>
+          <p className="mt-2 text-sm text-[#800020]/65">
+            Check Backend is running,And try again.
+          </p>
           <button
             onClick={checkLogin}
             className="mt-5 rounded-xl bg-[#800020] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#5e0018]"
@@ -278,7 +295,11 @@ if (!ok || data?.user?.role?.toLowerCase() !== "admin") {
     <div className="flex min-h-screen bg-[#faf7f2] text-[#800020]">
       {/* ---------- mobile overlay ---------- */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setMobileOpen(false)} aria-hidden />
+        <div
+          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden
+        />
       )}
 
       {/* ---------- sidebar ---------- */}
@@ -293,15 +314,21 @@ if (!ok || data?.user?.role?.toLowerCase() !== "admin") {
               <Icon name="trainers" />
             </span>
             <span className={hide}>
-              <span className="block text-base font-bold leading-tight">{settings.general.gymName}</span>
-              <span className="block text-[10px] font-semibold tracking-[0.2em] text-[#800020]/55">ADMIN PANEL</span>
+              <span className="block text-base font-bold leading-tight">
+                {settings.general.gymName}
+              </span>
+              <span className="block text-[10px] font-semibold tracking-[0.2em] text-[#800020]/55">
+                ADMIN PANEL
+              </span>
             </span>
           </Link>
 
           <button
             onClick={() => setCollapsed(!collapsed)}
             aria-label="Collapse sidebar"
-            className={`hidden rounded-lg p-1.5 text-[#800020]/70 hover:bg-[#800020]/10 lg:block ${collapsed ? "lg:hidden" : ""}`}
+            className={`hidden rounded-lg p-1.5 text-[#800020]/70 hover:bg-[#800020]/10 lg:block ${
+              collapsed ? "lg:hidden" : ""
+            }`}
           >
             <Icon name="collapse" />
           </button>
@@ -320,13 +347,17 @@ if (!ok || data?.user?.role?.toLowerCase() !== "admin") {
 
           {nav.map((g) => (
             <div key={g.group} className="mb-5">
-              <p className={`mb-2 px-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[#800020]/50 ${hide}`}>
+              <p
+                className={`mb-2 px-3 text-[11px] font-bold uppercase tracking-[0.2em] text-[#800020]/50 ${hide}`}
+              >
                 {g.group}
               </p>
               <ul className="space-y-1">
                 {g.items.map((item) => {
                   const itemPath = item.href.split("?")[0];
-                  const active = pathname === itemPath || pathname.startsWith(itemPath + "/");
+                  const active =
+                    pathname === itemPath ||
+                    pathname.startsWith(itemPath + "/");
                   return (
                     <li key={item.label}>
                       <Link
@@ -350,7 +381,9 @@ if (!ok || data?.user?.role?.toLowerCase() !== "admin") {
           ))}
         </nav>
 
-        <div className={`border-t border-[#800020]/10 px-5 py-4 text-center text-xs text-[#800020]/60 ${hide}`}>
+        <div
+          className={`border-t border-[#800020]/10 px-5 py-4 text-center text-xs text-[#800020]/60 ${hide}`}
+        >
           Powered by <b className="text-[#800020]">Clickmasters</b> v1.0
         </div>
       </aside>
@@ -399,18 +432,29 @@ if (!ok || data?.user?.role?.toLowerCase() !== "admin") {
                 </span>
                 <span className="hidden text-left leading-tight sm:block">
                   <span className="block text-sm font-bold">{user?.name}</span>
-                  <span className="block text-xs capitalize text-[#800020]/60">{user?.role}</span>
+                  <span className="block text-xs capitalize text-[#800020]/60">
+                    {user?.role}
+                  </span>
                 </span>
-                <Icon name="chevDown" className="hidden h-4 w-4 text-[#800020]/60 sm:block" />
+                <Icon
+                  name="chevDown"
+                  className="hidden h-4 w-4 text-[#800020]/60 sm:block"
+                />
               </button>
 
               {menuOpen && (
                 <>
-                  <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} aria-hidden />
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setMenuOpen(false)}
+                    aria-hidden
+                  />
                   <div className="absolute right-0 z-50 mt-2 w-56 rounded-2xl bg-white p-2 shadow-xl ring-1 ring-[#800020]/10">
                     <div className="border-b border-[#800020]/10 px-3 py-2.5">
                       <p className="text-sm font-bold">{user?.name}</p>
-                      <p className="truncate text-xs text-[#800020]/60">{user?.email}</p>
+                      <p className="truncate text-xs text-[#800020]/60">
+                        {user?.email}
+                      </p>
                     </div>
                     <button
                       onClick={logout}

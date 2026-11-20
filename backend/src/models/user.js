@@ -1,7 +1,6 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
-
 // Address Schema reusable schema can be used with member and trainer model
 const addressSchema = new mongoose.Schema(
   {
@@ -46,8 +45,6 @@ const emergencyContactSchema = new mongoose.Schema(
   { _id: false }
 );
 
- 
-
 const userSchema = new mongoose.Schema(
   {
     // Basic information
@@ -77,6 +74,10 @@ const userSchema = new mongoose.Schema(
     },
 
     photo: {
+      type: String,
+      default: "",
+    },
+    photoPublicId: {
       type: String,
       default: "",
     },

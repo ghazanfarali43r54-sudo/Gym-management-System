@@ -1,4 +1,6 @@
+
 const express = require("express");
+
 const {
   listRequests,
   createMember,
@@ -8,19 +10,28 @@ const {
   updateRequest,
   deleteRequest,
 } = require("../controllers/requestController");
+
 const { protect, adminOnly } = require("../middlewares/authMiddleware");
+const upload = require("../middlewares/upload");
 
 const router = express.Router();
 
-// is file ke saare routes sirf logged-in admin ke liye hain
+// All routes require admin authentication
 router.use(protect, adminOnly);
 
 router.get("/", listRequests);
-router.post("/", createMember);
+
+// Image upload middleware
+router.post("/", upload.single("photo"), createMember);
+
 router.get("/counts", getCounts);
+
 router.patch("/:id/accept", acceptRequest);
 router.patch("/:id/reject", rejectRequest);
-router.patch("/:id", updateRequest);
+
+// Image upload middleware
+router.patch("/:id", upload.single("photo"), updateRequest);
+
 router.delete("/:id", deleteRequest);
 
 module.exports = router;

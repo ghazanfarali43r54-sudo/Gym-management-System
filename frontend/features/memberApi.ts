@@ -251,49 +251,80 @@ type MemberPayloadInput = {
   emergencyRelationship: string;
   emergencyPhone: string;
   membershipPlanIds: string[];
-  photo: string;
+  selectedPhoto: File | null;
+  photoRemoved: boolean;
 };
 
 // Common fields used by both create and update
-const getCommonMemberPayload = (data: MemberPayloadInput) => ({
-  name: data.name.trim(),
-  email: data.email.trim(),
-  phone: data.phone.trim(),
-  status: data.status.toLowerCase(),
-  assignedTrainerId: data.assignedTrainerId || null,
-  gender: data.gender || "",
-  dateOfBirth: data.dateOfBirth || null,
-  address: {
-    street: data.street.trim(),
-    city: data.city.trim(),
-    country: data.country.trim(),
-  },
-  emergencyContact: {
-    name: data.emergencyName.trim(),
-    relationship: data.emergencyRelationship.trim(),
-    phone: data.emergencyPhone.trim(),
-  },
-  membershipPlanIds: data.membershipPlanIds,
-  photo: data.photo,
-});
+const getCommonMemberPayload = (data: MemberPayloadInput) => {
+  const payload = new FormData();
+
+  payload.append("name", data.name.trim());
+  payload.append("email", data.email.trim());
+  payload.append("phone", data.phone.trim());
+  payload.append("status", data.status.toLowerCase());
+  payload.append("assignedTrainerId", data.assignedTrainerId || "");
+  payload.append("gender", data.gender || "");
+  payload.append("dateOfBirth", data.dateOfBirth || "");
+
+  payload.append(
+    "address",
+    JSON.stringify({
+      street: data.street.trim(),
+      city: data.city.trim(),
+      country: data.country.trim(),
+    })
+  );
+
+  payload.append(
+    "emergencyContact",
+    JSON.stringify({
+      name: data.emergencyName.trim(),
+      relationship: data.emergencyRelationship.trim(),
+      phone: data.emergencyPhone.trim(),
+    })
+  );
+
+  payload.append(
+    "membershipPlanIds",
+    JSON.stringify(data.membershipPlanIds)
+  );
+
+  if (data.selectedPhoto) {
+    payload.append("photo", data.selectedPhoto);
+  }
+
+  if (data.photoRemoved) {
+    payload.append("removePhoto", "true");
+  }
+
+  return payload;
+};
 
 // Payload for creating a member
-export const buildCreateMemberPayload = (data: MemberPayloadInput) => ({
-  ...getCommonMemberPayload(data),
-  password: data.password,
-  role: "member",
-  message: "",
-});
+export const buildCreateMemberPayload = (data: MemberPayloadInput) => {
+  const payload = getCommonMemberPayload(data);
+
+  payload.append("password", data.password);
+  payload.append("role", "member");
+  payload.append("message", "");
+
+  return payload;
+};
 
 // Payload for updating a member
-export const buildUpdateMemberPayload = (data: MemberPayloadInput) => ({
-  ...getCommonMemberPayload(data),
-  ...(data.password ? { password: data.password } : {}),
-});
+export const buildUpdateMemberPayload = (data: MemberPayloadInput) => {
+  const payload = getCommonMemberPayload(data);
 
+  if (data.password) {
+    payload.append("password", data.password);
+  }
+
+  return payload;
+};
 // 5. API CALLS — Backend se baat karna
 
-type MemberPayload = Record<string, unknown>;
+type MemberPayload = FormData;
 
 type RequestOptions = {
   method?: Method;

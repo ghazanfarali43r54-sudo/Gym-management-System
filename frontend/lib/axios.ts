@@ -10,16 +10,31 @@ const axiosClient = axios.create({
 });
 
 axiosClient.interceptors.request.use((config) => {
+  // FormData ke liye browser ko Content-Type boundary set karne dein.
+  if (
+    typeof FormData !== "undefined" &&
+    config.data instanceof FormData
+  ) {
+    config.headers.delete("Content-Type");
+  }
+
+  // Existing authentication logic
   if (config.headers.has("Authorization")) return config;
 
   const session = getSession();
   const isAdminRequest = config.url?.startsWith("/api/admin/") ?? false;
   const isAdminSession = session?.user.role.toLowerCase() === "admin";
+
   const token = isAdminRequest
-    ? isAdminSession ? session?.token : null
+    ? isAdminSession
+      ? session?.token
+      : null
     : session?.token;
 
-  if (token) config.headers.set("Authorization", `Bearer ${token}`);
+  if (token) {
+    config.headers.set("Authorization", `Bearer ${token}`);
+  }
+
   return config;
 });
 

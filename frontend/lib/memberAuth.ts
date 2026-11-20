@@ -188,16 +188,4 @@ export function clearSession() {
   clearStoredSession();
 }
 
-// Role-aware logout keeps unrelated sessions intact and returns to one login.
-export function clearAuth(role: string) {
-  if (role === "admin") {
-    clearAdmin();
-  } else if (role === "trainer") {
-    clearTrainer();
-  } else {
-    clearMember();
-  }
-  if (typeof window !== "undefined") {
-    window.location.replace("/login");
-  }
-}
+

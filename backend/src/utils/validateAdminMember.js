@@ -40,14 +40,6 @@ function validateAdminMember(body, { partial = false } = {}) {
     }
   }
 
-  if (has("photo")) {
-    const photo = body.photo;
-    if (typeof photo !== "string" || (photo &&
-      (!photo.startsWith("data:image/jpeg;base64,") || photo.length > 150000))) {
-      errors.photo = "Photo must be a valid JPEG image.";
-    }
-  }
-
   if (has("gender") && body.gender &&
     !["male", "female", "other"].includes(String(body.gender).toLowerCase())) {
     errors.gender = "Select a valid gender.";

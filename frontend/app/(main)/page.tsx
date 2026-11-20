@@ -1,13 +1,13 @@
-import Navbar from "@/components/Navbar";
-import Hero from "@/components/Hero";
-import Marquee from "@/components/Marquee";
-import Features from "@/components/Features";
-import Membership from "@/components/Membership";
-import Shorts from "@/components/Shorts";
-import Calculator from "@/components/Calculator";
-import Review from "@/components/Review";
-import Pricing from "@/components/Pricing";
-import Trainer from "@/components/Trainer";
+import Navbar from "@/components/public page/Navbar";
+import Hero from "@/components/public page/Hero";
+import Marquee from "@/components/public page/Marquee";
+import Features from "@/components/public page/Features";
+import Membership from "@/components/public page/Membership";
+import Shorts from "@/components/public page/Shorts";
+import Calculator from "@/components/public page/Calculator";
+import Review from "@/components/public page/Review";
+import Pricing from "@/components/public page/Pricing";
+import Trainer from "@/components/public page/Trainer";
 
 
 export default function Home() {

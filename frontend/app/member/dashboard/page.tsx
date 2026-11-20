@@ -3,16 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { getMemberDashboard } from "@/features/memberApi";
 import { useSettings } from "@/lib/SettingsContext";
-import {
-  getMember,
-  clearMember,
-  type MemberUser,
-} from "@/lib/memberAuth";
+import { getMember, clearMember, type MemberUser } from "@/lib/memberAuth";
 
 type DashboardUser = MemberUser & {
   phone?: string;
   status?: string;
-   
 };
 
 type ApiResponse = {
@@ -41,8 +36,7 @@ export default function MemberDashboard() {
     try {
       const response = await getMemberDashboard();
       if (response.status === 401) {
-        clearMember();
-        window.location.replace("/login");
+        clearMember();//!self changees if any error 
         return;
       }
 
@@ -66,18 +60,18 @@ export default function MemberDashboard() {
   }, []);
 
   useEffect(() => {
-  const loadDashboard = async () => {
-    await fetchDashboard();
-  };
+    const loadDashboard = async () => {
+      await fetchDashboard();
+    };
 
-  loadDashboard();
-
-  const interval = setInterval(() => {
     loadDashboard();
-  }, 30000);
 
-  return () => clearInterval(interval);
-}, [fetchDashboard]);
+    const interval = setInterval(() => {
+      loadDashboard();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchDashboard]);
   // Logout member
   const handleLogout = () => {
     clearMember();
@@ -116,7 +110,6 @@ export default function MemberDashboard() {
   }
 
   if (!user) return null;
-
 
   const stats = [
     {
@@ -348,8 +341,6 @@ export default function MemberDashboard() {
               <div className="bg-gradient-to-r from-[#641629] to-[#831F3C] text-white px-6 py-4">
                 <h2 className="font-bold text-lg">♛ My Membership</h2>
               </div>
-
-              
             </div>
 
             {/* PROFILE */}
@@ -367,8 +358,6 @@ export default function MemberDashboard() {
                   label="Phone"
                   value={user.phone || "Not provided"}
                 />
-
-                 
 
                 <ProfileRow
                   label="Account Status"
@@ -398,8 +387,6 @@ export default function MemberDashboard() {
                 </p>
               </div>
             </div>
-
-             
           </section>
 
           {/* QUICK ACTIONS */}

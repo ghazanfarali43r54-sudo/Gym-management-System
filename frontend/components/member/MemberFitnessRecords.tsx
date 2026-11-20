@@ -1,4 +1,3 @@
-
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
@@ -10,9 +9,16 @@ import {
   saveMemberAssessment,
   saveMemberMeasurement,
 } from "@/features/memberApi";
-import { FitnessRecordTabs, type FitnessRecordTab } from "./FitnessRecordControls";
-import MemberMeasurementForm, { type MeasurementFormValues } from "./MemberMeasurementForm";
-import MemberAssessmentForm, { type AssessmentFormValues } from "./MemberAssessmentForm";
+import {
+  FitnessRecordTabs,
+  type FitnessRecordTab,
+} from "./FitnessRecordControls";
+import MemberMeasurementForm, {
+  type MeasurementFormValues,
+} from "./MemberMeasurementForm";
+import MemberAssessmentForm, {
+  type AssessmentFormValues,
+} from "./MemberAssessmentForm";
 import {
   AssessmentRecordList,
   MeasurementRecordList,
@@ -27,6 +33,12 @@ type Props = {
   formOnly?: boolean;
   onSaved?: () => void;
   onCancel?: () => void;
+  onAdd?: (tab: Exclude<FitnessRecordTab, "comparison">) => void;
+  onEdit?: (
+    type: "body-measurement" | "fitness-assessment",
+    recordId: string
+  ) => void;
+  editRecordId?: string | null;
 };
 
 const emptyMeasurement: MeasurementFormValues = {
@@ -139,6 +151,9 @@ export default function MemberFitnessRecords({
   formOnly = false,
   onSaved,
   onCancel,
+  onAdd,
+  onEdit,
+  editRecordId,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<FitnessRecordTab>(initialTab);
@@ -151,14 +166,17 @@ export default function MemberFitnessRecords({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const [showForm, setShowForm] = useState(openInitialForm);
+  const [showForm, setShowForm] = useState(openInitialForm && !editRecordId);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const updateProfileUrl = (nextTab?: FitnessRecordTab, recordId?: string) => {
     if (formOnly) return;
     const params = new URLSearchParams({ member: memberId });
     if (nextTab) {
-      params.set("fitness", nextTab === "measurements" ? "body-measurement" : "fitness-assessment");
+      params.set(
+        "fitness",
+        nextTab === "measurements" ? "body-measurement" : "fitness-assessment"
+      );
       if (recordId) params.set("record", recordId);
     }
     router.push(`/admin/members?${params.toString()}`);
@@ -194,24 +212,54 @@ export default function MemberFitnessRecords({
         );
       }
 
-      setMeasurements(
-        Array.isArray(measurementResponse.data?.measurements)
-          ? measurementResponse.data.measurements
-          : []
-      );
+      const nextMeasurements: MeasurementRecord[] = Array.isArray(
+        measurementResponse.data?.measurements
+      )
+        ? measurementResponse.data.measurements
+        : [];
 
-      setAssessments(
-        Array.isArray(assessmentResponse.data?.assessments)
-          ? assessmentResponse.data.assessments
-          : []
-      );
+      const nextAssessments: FitnessAssessment[] = Array.isArray(
+        assessmentResponse.data?.assessments
+      )
+        ? assessmentResponse.data.assessments
+        : [];
+
+      setMeasurements(nextMeasurements);
+      setAssessments(nextAssessments);
+      if (editRecordId && initialTab === "measurements") {
+        const record = nextMeasurements.find(
+          (item) => item._id === editRecordId
+        );
+
+        if (record) {
+          setEditingId(record._id);
+          setMeasurementForm(measurementToForm(record));
+          setShowForm(true);
+        } else {
+          setError("Body measurement record not found.");
+        }
+      }
+
+      if (editRecordId && initialTab === "assessments") {
+        const record = nextAssessments.find(
+          (item) => item._id === editRecordId
+        );
+
+        if (record) {
+          setEditingId(record._id);
+          setAssessmentForm(assessmentToForm(record));
+          setShowForm(true);
+        } else {
+          setError("Fitness assessment record not found.");
+        }
+      }
     } catch (err: unknown) {
       console.error("Member fitness records error:", err);
       setError(errorMessage(err, "Unable to load member fitness records."));
     } finally {
       setLoading(false);
     }
-  }, [memberId]);
+}, [memberId, editRecordId, initialTab]);
 
   useEffect(() => {
     // The async loader updates state after its requests resolve.
@@ -220,6 +268,11 @@ export default function MemberFitnessRecords({
   }, [loadRecords]);
 
   const openAddForm = () => {
+    if (onAdd && tab !== "comparison") {
+      onAdd(tab);
+      return;
+    }
+
     setEditingId(null);
     setError("");
     setSuccess("");
@@ -241,6 +294,10 @@ export default function MemberFitnessRecords({
   };
 
   const openMeasurementEdit = (item: MeasurementRecord) => {
+    if (onEdit) {
+      onEdit("body-measurement", item._id);
+      return;
+    }
     setEditingId(item._id);
     setMeasurementForm(measurementToForm(item));
     setError("");
@@ -250,6 +307,10 @@ export default function MemberFitnessRecords({
   };
 
   const openAssessmentEdit = (item: FitnessAssessment) => {
+    if (onEdit) {
+      onEdit("fitness-assessment", item._id);
+      return;
+    }
     setEditingId(item._id);
     setAssessmentForm(assessmentToForm(item));
     setError("");
@@ -325,13 +386,18 @@ export default function MemberFitnessRecords({
       );
 
     if (!hasMeasurementDetails) {
-      setError("Enter at least one measurement, progress photo URL, or note before saving.");
+      setError(
+        "Enter at least one measurement, progress photo URL, or note before saving."
+      );
       return;
     }
 
     for (const field of numericFields) {
       const value = measurementForm[field];
-      if (value.trim() !== "" && (!Number.isFinite(Number(value)) || Number(value) < 0)) {
+      if (
+        value.trim() !== "" &&
+        (!Number.isFinite(Number(value)) || Number(value) < 0)
+      ) {
         setError(`${field} must be a valid non-negative number.`);
         return;
       }
@@ -366,7 +432,11 @@ export default function MemberFitnessRecords({
     try {
       setSaving(true);
 
-      const response = await saveMemberMeasurement(memberId, editingId, payload);
+      const response = await saveMemberMeasurement(
+        memberId,
+        editingId,
+        payload
+      );
 
       if (!response.ok) {
         throw new Error(
@@ -451,9 +521,7 @@ export default function MemberFitnessRecords({
     if (
       tests.some(
         (test) =>
-          !test.testName ||
-          !Number.isFinite(test.result) ||
-          test.result < 0
+          !test.testName || !Number.isFinite(test.result) || test.result < 0
       )
     ) {
       setError(
@@ -516,7 +584,9 @@ export default function MemberFitnessRecords({
     type: Exclude<FitnessRecordTab, "comparison">
   ) => {
     const label =
-      type === "measurements" ? "this body measurement" : "this fitness assessment";
+      type === "measurements"
+        ? "this body measurement"
+        : "this fitness assessment";
 
     if (!window.confirm(`Are you sure you want to delete ${label}?`)) return;
 
@@ -539,14 +609,17 @@ export default function MemberFitnessRecords({
 
   return (
     <section className="space-y-5 rounded-2xl border border-[#eadfd9] bg-white p-4 shadow-sm sm:p-6">
-      {!formOnly && <div>
-        <h2 className="text-xl font-bold text-[#4b1725]">
-          Fitness & Body Progress
-        </h2>
-        <p className="mt-1 text-sm text-[#8b7771]">
-          View and manage this member&apos;s measurement history and fitness assessments.
-        </p>
-      </div>}
+      {!formOnly && (
+        <div>
+          <h2 className="text-xl font-bold text-[#4b1725]">
+            Fitness & Body Progress
+          </h2>
+          <p className="mt-1 text-sm text-[#8b7771]">
+            View and manage this member&apos;s measurement history and fitness
+            assessments.
+          </p>
+        </div>
+      )}
 
       {!formOnly && (
         <FitnessRecordTabs
@@ -560,7 +633,13 @@ export default function MemberFitnessRecords({
             setError("");
             setSuccess("");
           }}
-          onCompare={() => router.push(`/admin/members/${encodeURIComponent(memberId)}/fitness/comparison`)}
+          onCompare={() =>
+            router.push(
+              `/admin/members/${encodeURIComponent(
+                memberId
+              )}/fitness/comparison`
+            )
+          }
         />
       )}
 
