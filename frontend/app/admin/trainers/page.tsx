@@ -228,7 +228,7 @@ function TrainersPageContent() {
     router.push(`/admin/trainers/${trainerId}/dashboard`);
   };
 
-  const gymName = settings?.general?.gymName?.trim() || "GymMaster Pro";
+  const gymName = settings?.general?.gymName?.trim() || "GymFitness";
 
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [loading, setLoading] = useState(true);

@@ -21,7 +21,7 @@ export default function MemberDashboard() {
   const [error, setError] = useState("");
   const [profileDropdown, setProfileDropdown] = useState(false);
   const { settings } = useSettings();
-  const gymName = settings.general.gymName || "GymMaster Pro";
+  const gymName = settings.general.gymName || "Gym Fitness";
   const tagline = settings.general.tagline;
 
   // Fetch member dashboard

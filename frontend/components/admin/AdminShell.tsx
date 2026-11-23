@@ -217,7 +217,13 @@ function AdminShellContent({ children }: { children: ReactNode }) {
     setChecking(true);
     setConnectError(false);
 
+console.log("ADMIN AUTH CHECK:", {
+  adminTokenExists: !!getAdminToken(),
+  currentPath: window.location.pathname,
+});
+
     if (!getAdminToken()) {
+        console.log("NO ADMIN TOKEN - REDIRECTING TO LOGIN");   
       router.replace("/login");
       return;
     }

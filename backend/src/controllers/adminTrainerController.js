@@ -349,8 +349,6 @@ exports.deleteTrainer = async (req, res) => {
   }
 };
 
-
-// GET SELECTED TRAINER DASHBOARD
 // GET SELECTED TRAINER DASHBOARD
 exports.getTrainerDashboard = async (req, res) => {
   try {

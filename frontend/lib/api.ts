@@ -24,7 +24,7 @@ export function clearAdminSession(): void {
 }
 
 type ApiOptions = {
-  method?: string;
+  method?: string;  
   body?: string;
 };
 

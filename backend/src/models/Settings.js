@@ -59,7 +59,7 @@ const settingsSchema = new mongoose.Schema(
     general: {
       gymName: {
         type: String,
-        default: "GymMaster Pro",
+        default: "Gym Fitness",
         trim: true,
       },
 

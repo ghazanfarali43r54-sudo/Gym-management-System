@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useId, useState, type ReactNode } from "react";
+import { clearSession, getSession } from "@/lib/memberAuth";
+import { useAdminRouteProtection } from "@/hooks/useAdminRouteProtection";
 
 /* =====================================================================
     ICONS (inline SVG, no package needed)
@@ -459,7 +461,7 @@ function Sidebar({
         <div
           className={`border-t border-[#800020]/10 px-5 py-4 text-center text-xs text-[#800020]/60 ${hide}`}
         >
-          Powered by <b className="text-[#800020]">GymMaster Pro</b> v1.0
+          Powered by <b className="text-[#800020]">Clickmasters</b> v1.0
         </div>
       </aside>
     </>
@@ -477,27 +479,21 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
 
   // Login ke waqt jo user save hua tha (name, email) wo yahan se uthao
   useEffect(() => {
-    try {
-      const raw =
-        localStorage.getItem("user") || sessionStorage.getItem("user");
-      if (raw) {
-        const u = JSON.parse(raw);
-        setAdmin({ name: u.name || "Admin", email: u.email || "" });
-      }
-    } catch {
-      // koi masla ho to default "Admin" hi dikhe
+    const session = getSession();
+
+    if (session?.user) {
+      setAdmin({
+        name: session.user.name || "Admin",
+        email: session.user.email || "",
+      });
     }
   }, []);
 
   // Logout: token hatao aur login page par bhej do
   function logout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    sessionStorage.removeItem("token");
-    sessionStorage.removeItem("user");
+    clearSession();
     router.replace("/login");
   }
-
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between gap-4 border-b border-[#800020]/10 bg-[#faf7f2]/85 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
       <div className="flex flex-1 items-center gap-3">
@@ -601,6 +597,7 @@ function Topbar({ onMenu }: { onMenu: () => void }) {
     ===================================================================== */
 
 export default function Dashboard() {
+  const { checking, connectError } = useAdminRouteProtection();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -668,6 +665,34 @@ export default function Dashboard() {
   function refresh() {
     setRefreshing(true);
     setTimeout(() => setRefreshing(false), 900);
+  }
+
+    // Show loading while admin access is being verified.
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#faf7f2]">
+        <p className="font-semibold text-[#800020]">
+          Verifying admin access...
+        </p>
+      </div>
+    );
+  }
+
+  // Show an error if the backend cannot be reached.
+  if (connectError) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#faf7f2]">
+        <p className="font-semibold text-[#800020]">
+          Unable to connect to the server.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="rounded-lg bg-[#800020] px-5 py-2 text-white"
+        >
+          Try Again
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -824,7 +849,6 @@ export default function Dashboard() {
                       <p className="truncate font-bold text-[#800020]">
                         {p.name}
                       </p>
-                      
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-bold">{p.amount}</p>

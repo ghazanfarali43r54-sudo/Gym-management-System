@@ -179,7 +179,7 @@ export default function AdminAttendancePage() {
           <div>
             <div className="mb-2 flex items-center gap-2">
               <span className="rounded-full bg-[#800020]/10 px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#800020]">
-                GymMaster Pro
+                GymFitness
               </span>
 
               <span className="h-1 w-1 rounded-full bg-[#c0405a]" />

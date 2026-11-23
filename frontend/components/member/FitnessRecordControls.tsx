@@ -105,7 +105,7 @@ export function FitnessRecordFormHeader({ title, saving, onClose }: FormHeaderPr
         className="text-2xl text-[#8b7771]"
         aria-label="Close form"
       >
-        ×
+        × 
       </button>
     </div>
   );

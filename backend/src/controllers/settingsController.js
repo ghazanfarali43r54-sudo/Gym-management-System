@@ -44,16 +44,6 @@ function timeToMinutes(time) {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + minutes;
 }
-
-/*
-  Business hours validation
-
-  Check karega:
-  1. time valid HH:MM ho
-  2. opening < closing ho
-  3. morning aur evening overlap na karein
-  4. open day mein kam az kam ek session enabled ho
-*/
 function validateBusinessHours(businessHours) {
   for (const dayName of DAYS) {
     const day = businessHours?.[dayName];
@@ -138,7 +128,7 @@ function validateBusinessHours(businessHours) {
 // GET /api/settings
 exports.getSettings = async (req, res) => {
   try {
-    console.log("Fetching settings... settingsController.js");
+
     const settings = await getOrCreateSettings();
 
     res.json({

@@ -53,7 +53,7 @@ export type SiteSettings = {
 
 const defaults: SiteSettings = {
   general: {
-    gymName: "GymMaster Pro",
+    gymName: "Gym Fitness",
     tagline: "Your partner in fitness management",
     email: "",
     phone: "",

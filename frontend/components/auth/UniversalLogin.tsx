@@ -1,28 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { useSettings } from "@/lib/SettingsContext";
-import { API_URL } from "@/lib/api";
-import { saveSession } from "@/lib/memberAuth";
-
-type LoginResponse = {
-  token?: string;
-  user?: {
-    id?: string;
-    name?: string;
-    email?: string;
-    role?: string;
-    photo?: string;
-    dashboardPath?: string;
-  };
-  message?: string;
-  redirectTo?: string;
-};
+import { useAuthLogin } from "@/hooks/authHooks";
 
 function MailIcon() {
   return (
     <svg
+      aria-hidden="true"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -38,6 +23,7 @@ function MailIcon() {
 function LockIcon() {
   return (
     <svg
+      aria-hidden="true"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -54,6 +40,7 @@ function EyeIcon({ open }: { open: boolean }) {
   if (open) {
     return (
       <svg
+        aria-hidden="true"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -84,6 +71,7 @@ function EyeIcon({ open }: { open: boolean }) {
 function LoginIcon() {
   return (
     <svg
+      aria-hidden="true"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -100,6 +88,7 @@ function LoginIcon() {
 function ShieldIcon() {
   return (
     <svg
+      aria-hidden="true"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -115,6 +104,7 @@ function ShieldIcon() {
 function DumbbellIcon() {
   return (
     <svg
+      aria-hidden="true"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -129,108 +119,23 @@ function DumbbellIcon() {
 export default function UniversalLogin() {
   const { settings } = useSettings();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-
-  const [showPassword, setShowPassword] = useState(false);
-  const [remember, setRemember] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  // Login states and functionality from custom hook
+  const {
+    email,
+    setEmail,
+    password,
+    setPassword,
+    showPassword,
+    setShowPassword,
+    remember,
+    setRemember,
+    loading,
+    error,
+    handleSubmit,
+  } = useAuthLogin();
 
   const gymName = settings.general.gymName || "GymMaster Pro";
 
- async function handleSubmit(
-  event: React.FormEvent<HTMLFormElement>
-) {
-  event.preventDefault();
-  setError("");
-
-  if (!email.trim()) {
-    setError("Please enter your email.");
-    return;
-  }
-
-  if (!password) {
-    setError("Please enter your password.");
-    return;
-  }
-
-  try {
-    setLoading(true);
-
-    const response = await fetch(`${API_URL}/api/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email: email.trim(),
-        password,
-      }),
-    });
-
-    const data: LoginResponse = await response.json();
-// console.log(data)
-    // Check API response
-    if (!response.ok) {
-      throw new Error(
-        data.message || "Invalid email or password."
-      );
-    }
-
-    // Check token and user
-    if (!data.token || !data.user) {
-      throw new Error("Login response is incomplete.");
-    }
-
-    // Check user information
-    const user = data.user;
-
-    if (!user.id || !user.name || !user.email) {
-      throw new Error("User information is incomplete.");
-    }
-
-    // Get and normalize role
-    const role = user.role?.toLowerCase();
-
-    if (!role) {
-      throw new Error("User role is missing.");
-    }
-
-    if (
-      role !== "admin" &&
-      role !== "trainer" &&
-      role !== "member"
-    ) {
-      throw new Error("Invalid user role.");
-    }
-
-    // Dashboard redirect path
-    const redirectTo = data.redirectTo || user.dashboardPath || "/";
-
-    // Save separate session according to role
-    saveSession(data.token, {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: role,
-      photo: user.photo,
-      dashboardPath: redirectTo,
-    }, remember);
-
-    // Redirect user to dashboard
-    window.location.assign(redirectTo);
-
-  } catch (err) {
-    setError(
-      err instanceof Error
-        ? err.message
-        : "Something went wrong. Please try again."
-    );
-  } finally {
-    setLoading(false);
-  }
-}
   return (
     <main className="min-h-screen bg-[#faf9f7] px-4 py-8 text-[#4b4b4b] sm:px-6">
       {/* TOP RIGHT PORTAL */}
@@ -238,7 +143,6 @@ export default function UniversalLogin() {
       <div className="fixed right-5 top-5 z-10 sm:right-8 sm:top-7">
         <div className="flex items-center gap-2 rounded-full border border-[#e8e4df] bg-white px-4 py-2.5 text-sm font-medium text-[#555] shadow-sm">
           <ShieldIcon />
-
           <span>Gym Fitness Portal</span>
         </div>
       </div>
@@ -279,12 +183,16 @@ export default function UniversalLogin() {
 
           <form
             onSubmit={handleSubmit}
+            noValidate
             className="rounded-[24px] border border-[#e7e3de] bg-white p-6 shadow-[0_10px_35px_rgba(0,0,0,0.04)] sm:p-8"
           >
             {/* ERROR */}
 
             {error && (
-              <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+              <div
+                role="alert"
+                className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-600"
+              >
                 {error}
               </div>
             )}
@@ -292,7 +200,10 @@ export default function UniversalLogin() {
             {/* EMAIL */}
 
             <div className="mb-5">
-              <label className="mb-2 block text-sm font-semibold text-[#555]">
+              <label
+                htmlFor="email"
+                className="mb-2 block text-sm font-semibold text-[#555]"
+              >
                 Email
               </label>
 
@@ -302,11 +213,10 @@ export default function UniversalLogin() {
                 </span>
 
                 <input
+                  id="email"
                   type="email"
                   value={email}
-                  onChange={(event) =>
-                    setEmail(event.target.value)
-                  }
+                  onChange={(event) => setEmail(event.target.value)}
                   placeholder="Enter your email"
                   autoComplete="email"
                   className="h-full w-full bg-transparent text-[16px] text-[#333] outline-none placeholder:text-[#a5a5a5]"
@@ -317,7 +227,10 @@ export default function UniversalLogin() {
             {/* PASSWORD */}
 
             <div className="mb-5">
-              <label className="mb-2 block text-sm font-semibold text-[#555]">
+              <label
+                htmlFor="password"
+                className="mb-2 block text-sm font-semibold text-[#555]"
+              >
                 Password
               </label>
 
@@ -327,15 +240,10 @@ export default function UniversalLogin() {
                 </span>
 
                 <input
-                  type={
-                    showPassword
-                      ? "text"
-                      : "password"
-                  }
+                  id="password"
+                  type={showPassword ? "text" : "password"}
                   value={password}
-                  onChange={(event) =>
-                    setPassword(event.target.value)
-                  }
+                  onChange={(event) => setPassword(event.target.value)}
                   placeholder="Enter your password"
                   autoComplete="current-password"
                   className="h-full w-full bg-transparent text-[16px] text-[#333] outline-none placeholder:text-[#a5a5a5]"
@@ -343,17 +251,10 @@ export default function UniversalLogin() {
 
                 <button
                   type="button"
-                  onClick={() =>
-                    setShowPassword(
-                      (value) => !value
-                    )
-                  }
+                  onClick={() => setShowPassword((value) => !value)}
                   className="ml-3 shrink-0 text-[#888] transition hover:text-[#913d4c]"
-                  aria-label={
-                    showPassword
-                      ? "Hide password"
-                      : "Show password"
-                  }
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
                 >
                   <EyeIcon open={showPassword} />
                 </button>
@@ -363,27 +264,24 @@ export default function UniversalLogin() {
             {/* REMEMBER / FORGOT */}
 
             <div className="mb-6 flex items-center justify-between gap-4">
-              <label className="flex cursor-pointer items-center gap-2.5 text-sm text-[#555]">
+              <label
+                htmlFor="remember"
+                className="flex cursor-pointer items-center gap-2.5 text-sm text-[#555]"
+              >
                 <input
+                  id="remember"
                   type="checkbox"
                   checked={remember}
-                  onChange={(event) =>
-                    setRemember(
-                      event.target.checked
-                    )
-                  }
+                  onChange={(event) => setRemember(event.target.checked)}
                   className="h-5 w-5 accent-[#913d4c]"
                 />
 
                 <span>Remember me</span>
               </label>
-
               <button
                 type="button"
                 onClick={() => {
-                  alert(
-                    "Password reset functionality can be connected here."
-                  );
+                  alert("Password reset functionality can be connected here.");
                 }}
                 className="text-sm font-medium text-[#555] transition hover:text-[#913d4c]"
               >
@@ -396,13 +294,12 @@ export default function UniversalLogin() {
             <button
               type="submit"
               disabled={loading}
+              aria-busy={loading}
               className="flex h-[60px] w-full items-center justify-center gap-3 rounded-2xl bg-[#913d4c] text-[17px] font-bold text-white shadow-lg shadow-[#913d4c]/15 transition hover:bg-[#7e3442] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <LoginIcon />
 
-              {loading
-                ? "Signing in..."
-                : "Sign In"}
+              {loading ? "Signing in..." : "Sign In"}
             </button>
 
             {/* SECURITY */}
@@ -410,17 +307,13 @@ export default function UniversalLogin() {
             <div className="mt-7 flex items-center justify-center gap-2 text-sm text-[#777]">
               <LockIcon />
 
-              <span>
-                Secure login – Your data is protected
-              </span>
+              <span>Secure login – Your data is protected</span>
             </div>
 
             {/* CREATE ACCOUNT */}
 
             <div className="mt-7 border-t border-[#eeeae6] pt-6 text-center">
-              <p className="text-sm text-[#777]">
-                Don&apos;t have an account?
-              </p>
+              <p className="text-sm text-[#777]">Don&apos;t have an account?</p>
 
               <Link
                 href="/register"
