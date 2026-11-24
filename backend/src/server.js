@@ -11,8 +11,9 @@ const membershipPlanRoutes = require("./routes/membershipPlan");
 const features = require("./routes/features");
 const bodyMeasurementRoutes = require("./routes/bodyMeasurementRoutes");
 const fitnessAssessmentRoutes = require("./routes/fitnessAssessmentRoutes");
+const { verifyEmailConnection } = require("./utils/sendEmail");
 
-
+verifyEmailConnection();///use for checking Gmail SMTP connection 
 const app = express();
 
 app.use(cors({origin: "http://localhost:3000",credentials: true,}));
@@ -27,6 +28,7 @@ app.use("/api/membership-plans", membershipPlanRoutes);
 app.use("/api/features", features);
 app.use("/api/body-measurements", bodyMeasurementRoutes);
 app.use("/api/fitness-assessments", fitnessAssessmentRoutes);
+
 
 
 const PORT = process.env.PORT || 5001;

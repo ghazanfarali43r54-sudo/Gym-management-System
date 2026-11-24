@@ -23,6 +23,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.11.2",
     "multer": "^2.5.0",
+    "nodemailer": "^10.6.1",
     "nodemon": "^3.1.14"
   }
 }

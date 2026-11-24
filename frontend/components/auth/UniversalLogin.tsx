@@ -278,15 +278,12 @@ export default function UniversalLogin() {
 
                 <span>Remember me</span>
               </label>
-              <button
-                type="button"
-                onClick={() => {
-                  alert("Password reset functionality can be connected here.");
-                }}
+              <Link
+                href="/forgot-password"
                 className="text-sm font-medium text-[#555] transition hover:text-[#913d4c]"
               >
                 Forgot password?
-              </button>
+              </Link>
             </div>
 
             {/* SIGN IN */}

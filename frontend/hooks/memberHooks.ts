@@ -453,58 +453,64 @@ export function useMemberForm({ member, onSaved }: UseMemberFormOptions) {
     setTrainerId(id);
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError("");
+  
+const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  event.preventDefault();
 
-    if (!validateForm()) {
-      return;
-    }
-    try {
-      setSubmitting(true);
-      const input = {
-        ...form,
-        assignedTrainerId: trainerId,
-        membershipPlanIds,
-        selectedPhoto,
-        photoRemoved,
-      };
-      const response = member
-        ? await updateMember(member.id, buildUpdateMemberPayload(input))
-        : await createMember(buildCreateMemberPayload(input));
+  setError("");
+  setFieldErrors({});
 
-      if (!response.ok) {
-        throw Object.assign(
-          new Error(response.data?.message || "Unable to save member."),
-          { fieldErrors: response.data?.errors }
-        );
-      }
+  if (!validateForm()) {
+    return;
+  }
 
-      await onSaved();
-    } catch (err: unknown) {
-      console.error("Member save error:", err);
-      const responseErrors =
-        err instanceof Error && "fieldErrors" in err
-          ? err.fieldErrors
-          : undefined;
+  try {
+    setSubmitting(true);
+
+    const input = {
+      ...form,
+      assignedTrainerId: trainerId,
+      membershipPlanIds,
+      selectedPhoto,
+      photoRemoved,
+    };
+
+    const response = member
+      ? await updateMember(member.id, buildUpdateMemberPayload(input))
+      : await createMember(buildCreateMemberPayload(input));
+
+    if (!response.ok) {
+      const responseErrors = response.data?.errors;
+
       if (responseErrors && typeof responseErrors === "object") {
         setFieldErrors(
-          mapMemberApiErrors(responseErrors as Record<string, unknown>)
+          mapMemberApiErrors(
+            responseErrors as Record<string, unknown>
+          )
         );
-        setError(
-          err instanceof Error && err.message === "Validation failed"
-            ? "Please correct the highlighted fields."
-            : err instanceof Error
-            ? err.message
-            : "Unable to save member."
-        );
-      } else {
-        setError(err instanceof Error ? err.message : "Unable to save member.");
       }
-    } finally {
-      setSubmitting(false);
+
+      setError(
+        response.data?.message === "Validation failed"
+          ? "Please correct the highlighted fields."
+          : response.data?.message || "Unable to save member."
+      );
+
+      return;
     }
-  };
+
+    await onSaved();
+  } catch (err: unknown) {
+    setError(
+      err instanceof Error
+        ? err.message
+        : "Unable to save member."
+    );
+  } finally {
+    setSubmitting(false);
+  }
+};
+
 
   return {
     state: {
