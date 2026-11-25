@@ -39,10 +39,18 @@ function MemberActionsMenu({
 }: MemberActionsProps) {
   return (
     <div
-      className={compact ? "mt-4 flex justify-end border-t border-[#eee5e0] pt-3" : "px-5 py-4"}
+      className={
+        compact
+          ? "mt-4 flex justify-end border-t border-[#eee5e0] pt-3"
+          : "px-5 py-4"
+      }
       onClick={(event) => event.stopPropagation()}
     >
-      <details className={compact ? "group relative" : "group relative flex justify-end"}>
+      <details
+        className={
+          compact ? "group relative" : "group relative flex justify-end"
+        }
+      >
         <summary
           aria-label={`Actions for ${member.name}`}
           className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-full border border-[#e7dcd6] text-xl leading-none text-[#641d32] hover:bg-[#faf2f3] [&::-webkit-details-marker]:hidden"
@@ -136,7 +144,8 @@ export default function MemberList({
         member.name.toLowerCase().includes(query) ||
         member.email.toLowerCase().includes(query) ||
         member.phone.toLowerCase().includes(query);
-      const matchesStatus = statusFilter === "All" || member.status === statusFilter;
+      const matchesStatus =
+        statusFilter === "All" || member.status === statusFilter;
       return matchesSearch && matchesStatus;
     });
   }, [members, search, statusFilter]);
@@ -173,7 +182,11 @@ export default function MemberList({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Total Members" value={members.length} />
-        <StatCard label="Active Members" value={memberCounts.Active} valueClass="text-green-700" />
+        <StatCard
+          label="Active Members"
+          value={memberCounts.Active}
+          valueClass="text-green-700"
+        />
         <StatCard
           label="Inactive / Pending"
           value={memberCounts.Inactive + memberCounts.Pending}
@@ -191,7 +204,9 @@ export default function MemberList({
         />
         <select
           value={statusFilter}
-          onChange={(event) => setStatusFilter(event.target.value as MemberStatusFilter)}
+          onChange={(event) =>
+            setStatusFilter(event.target.value as MemberStatusFilter)
+          }
           className="rounded-xl border border-[#e7dcd6] bg-[#fffdfa] px-4 py-3 text-sm outline-none focus:border-[#641d32]"
         >
           <option value="All">All Statuses</option>
@@ -247,14 +262,40 @@ export default function MemberList({
                       className="cursor-pointer transition hover:bg-[#fcf8f5]"
                     >
                       <td className="px-5 py-4">
-                        <div className="font-semibold text-[#4b1725]">{member.name}</div>
-                        <div className="mt-1 text-xs text-[#8b7771]">{member.email}</div>
+                        <div className="flex items-center gap-3">
+                          {member.photo ? (
+                            <img
+                              src={member.photo}
+                              alt={`${member.name}'s profile`}
+                              className="h-11 w-11 shrink-0 rounded-full border border-[#eadfd9] object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#f3eae5] text-sm font-bold text-[#641d32]">
+                              {member.name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+
+                          <div className="min-w-0">
+                            <div className="truncate font-semibold text-[#4b1725]">
+                              {member.name}
+                            </div>
+                            <div className="mt-1 truncate text-xs text-[#8b7771]">
+                              {member.email}
+                            </div>
+                          </div>
+                        </div>
                       </td>
-                      <td className="px-5 py-4 text-[#6f5b55]">{member.phone || "—"}</td>
+                      <td className="px-5 py-4 text-[#6f5b55]">
+                        {member.phone || "—"}
+                      </td>
                       <td className="px-5 py-4">
                         <span
                           className="inline-flex min-w-9 items-center justify-center rounded-full bg-[#f3eae5] px-3 py-1 text-xs font-semibold text-[#641d32]"
-                          title={`${member.measurementCount} body measurement record${member.measurementCount === 1 ? "" : "s"}`}
+                          title={`${
+                            member.measurementCount
+                          } body measurement record${
+                            member.measurementCount === 1 ? "" : "s"
+                          }`}
                         >
                           {member.measurementCount}
                         </span>
@@ -285,11 +326,30 @@ export default function MemberList({
                   onClick={() => onSelectMember(member)}
                   className="cursor-pointer rounded-xl border border-[#eadfd9] bg-[#fffdfa] p-4 transition hover:border-[#c9aeb4]"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3 className="truncate font-bold text-[#4b1725]">{member.name}</h3>
-                      <p className="mt-1 break-all text-xs text-[#8b7771]">{member.email}</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      {member.photo ? (
+                        <img
+                          src={member.photo}
+                          alt={`${member.name}'s profile`}
+                          className="h-12 w-12 shrink-0 rounded-full border border-[#eadfd9] object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#f3eae5] font-bold text-[#641d32]">
+                          {member.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+
+                      <div className="min-w-0">
+                        <h3 className="truncate font-bold text-[#4b1725]">
+                          {member.name}
+                        </h3>
+                        <p className="mt-1 break-all text-xs text-[#8b7771]">
+                          {member.email}
+                        </p>
+                      </div>
                     </div>
+
                     <MemberStatusBadge member={member} compact />
                   </div>
 
@@ -300,7 +360,9 @@ export default function MemberList({
                     </div>
                     <div>
                       <p className="text-[#9a8982]">Measurements</p>
-                      <p className="mt-1 font-semibold text-[#641d32]">{member.measurementCount}</p>
+                      <p className="mt-1 font-semibold text-[#641d32]">
+                        {member.measurementCount}
+                      </p>
                     </div>
                   </div>
 
@@ -340,10 +402,20 @@ function StatCard({
   );
 }
 
-function MemberStatusBadge({ member, compact = false }: { member: Member; compact?: boolean }) {
+function MemberStatusBadge({
+  member,
+  compact = false,
+}: {
+  member: Member;
+  compact?: boolean;
+}) {
   return (
     <span
-      className={`${compact ? "shrink-0 " : ""}rounded-full px-3 py-1 text-xs font-semibold ${statusClass(member.status)}`}
+      className={`${
+        compact ? "shrink-0 " : ""
+      }rounded-full px-3 py-1 text-xs font-semibold ${statusClass(
+        member.status
+      )}`}
     >
       {member.status}
     </span>

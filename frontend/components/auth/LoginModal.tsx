@@ -39,7 +39,7 @@ export default function LoginModal({
   defaultEmail?: string;
   approved?: boolean; // true ho to "request manzoor ho gayi" ka hara box dikhta hai
 }) {
-  const [email, setEmail] = useState(defaultEmail);
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [error, setError] = useState("");
@@ -141,7 +141,7 @@ export default function LoginModal({
               type="email"
               className={inputCls}
               placeholder="ali@example.com"
-              autoComplete="email"
+              autoComplete="off"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -154,7 +154,7 @@ export default function LoginModal({
                 type={show ? "text" : "password"}
                 className={`${inputCls} pr-12`}
                 placeholder="Your password"
-                autoComplete="current-password"
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />

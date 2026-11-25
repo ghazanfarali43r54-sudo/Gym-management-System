@@ -476,7 +476,9 @@ console.log("ADMIN AUTH CHECK:", {
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
+  <main className="flex-1 px-4 pb-4 pt-2 sm:px-6 sm:pb-6 sm:pt-3 lg:px-2 lg:pb-3 lg:pt-0">
+  {children}
+</main>
       </div>
     </div>
   );

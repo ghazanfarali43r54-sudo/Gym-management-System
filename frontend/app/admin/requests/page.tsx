@@ -417,7 +417,7 @@ export default function RequestsPage() {
 
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.25em] text-[#800020]/60">
-                Members
+                Members / Trainers
               </p>
 
               <h1 className="text-2xl font-extrabold text-[#800020] sm:text-3xl">

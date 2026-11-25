@@ -13,7 +13,7 @@ export function useAuthLogin() {
 
   // Login UI state
   const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [remember, setRemember] = useState<boolean>(true);
+  const [remember, setRemember] = useState<boolean>(false );
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
 

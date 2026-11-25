@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { API_URL } from "@/lib/api";
 import { useRouter } from "next/navigation";
+
+import { API_URL } from "@/lib/api";
+
 import {
   clearRequest,
   clearSession,
@@ -15,6 +17,7 @@ import {
   type MemberUser,
   type SavedRequest,
 } from "@/lib/memberAuth";
+
 import RegisterModal from "./RegisterModal";
 import LoginModal from "./LoginModal";
 
@@ -30,15 +33,19 @@ type ModalName = "none" | "register" | "login" | "pendingInfo" | "rejectedInfo";
 
 type RequestStatus = "pending" | "active" | "rejected" | "gone" | "error";
 
-// Server se registration request ka status check karein
+/* ================= REQUEST STATUS ================= */
+
 async function fetchStatus(id: string): Promise<RequestStatus> {
   try {
-    const res = await fetch(`${API_URL}/api/public/register/${id}/status`);
+    const res = await fetch(`${API_URL}/api/public/register/${id}/status`, {
+      cache: "no-store",
+    });
 
     if (res.status === 404) return "gone";
     if (!res.ok) return "error";
 
     const data = await res.json();
+
     return ["pending", "active", "rejected"].includes(data.status)
       ? data.status
       : "error";
@@ -47,13 +54,16 @@ async function fetchStatus(id: string): Promise<RequestStatus> {
   }
 }
 
-// Popup ko body mein render karne ke liye
+/* ================= PORTAL ================= */
+
 function Portal({ children }: { children: ReactNode }) {
   if (typeof document === "undefined") return null;
+
   return createPortal(children, document.body);
 }
 
-// Information popup
+/* ================= INFO MODAL ================= */
+
 function InfoModal({
   title,
   children,
@@ -64,11 +74,12 @@ function InfoModal({
   onClose: () => void;
 }) {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
     };
 
     window.addEventListener("keydown", onKey);
+
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
@@ -80,17 +91,19 @@ function InfoModal({
       <div
         role="dialog"
         aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(event) => event.stopPropagation()}
         className="w-full max-w-sm rounded-3xl bg-white p-6 text-center shadow-2xl"
       >
         <h3 className="text-lg font-extrabold text-[#800020]">{title}</h3>
+
         <div className="mt-2 text-sm text-[#800020]/70">{children}</div>
       </div>
     </div>
   );
 }
 
-// Main Navbar Authentication
+/* ================= MAIN NAVBAR AUTH ================= */
+
 export default function NavbarAuth() {
   const router = useRouter();
 
@@ -101,32 +114,42 @@ export default function NavbarAuth() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState("");
 
-  const refreshStatus = useCallback(async (req: SavedRequest) => {
-    const status = await fetchStatus(req.id);
+  /* ================= REFRESH REQUEST STATUS ================= */
 
-    if (status === "gone") {
-      clearRequest();
-      setSaved(null);
-      setView("guest");
-    } else if (status === "pending") {
-      setView("pending");
-    } else if (status === "active") {
-      setView("approved");
-    } else if (status === "rejected") {
-      setView("rejected");
-    } else if (status === "error") {
-      // A failed status check must not leave the navbar stuck on its loader.
-      setView("guest");
-    }
-  }, []);
+  const refreshStatus = useCallback(
+    async (req: SavedRequest, isCurrent: () => boolean = () => true) => {
+      const status = await fetchStatus(req.id);
 
-  // IMPORTANT: Public Navbar sirf Member/Trainer session check karega.
-  // Admin session ko bilkul touch nahi karega.
+      // Purana response current authentication state ko overwrite na kare.
+      if (!isCurrent()) return;
+
+      if (status === "gone") {
+        clearRequest();
+        setSaved(null);
+        setView("guest");
+      } else if (status === "pending") {
+        setView("pending");
+      } else if (status === "active") {
+        setView("approved");
+      } else if (status === "rejected") {
+        setView("rejected");
+      } else {
+        // Failed status check par loader stuck nahi hoga.
+        setView("guest");
+      }
+    },
+    []
+  );
+
+  /* ================= INITIAL AUTH CHECK ================= */
+
   useEffect(() => {
     let cancelled = false;
 
     async function init() {
       const session = getSession();
+
+      // Public navbar admin session ko use ya clear nahi karega.
       const currentMember =
         session && session.user.role.toLowerCase() !== "admin" ? session : null;
 
@@ -141,18 +164,22 @@ export default function NavbarAuth() {
           if (res.status === 401) {
             clearSession();
           } else {
+            // Existing session ko server unavailable ya non-401
+            // response ki wajah se unnecessarily hide nahi karna.
             if (!cancelled) {
               setMember(currentMember.user);
               setView("member");
             }
+
             return;
           }
         } catch {
-          // Server unavailable ho to existing member login show karein
+          // Network error par existing member session preserve rahega.
           if (!cancelled) {
             setMember(currentMember.user);
             setView("member");
           }
+
           return;
         }
       }
@@ -160,24 +187,29 @@ export default function NavbarAuth() {
       const req = getSavedRequest();
 
       if (req) {
-        if (!cancelled) setSaved(req);
-        await refreshStatus(req);
-      } else {
-        if (!cancelled) setView("guest");
+        if (!cancelled) {
+          setSaved(req);
+        }
+
+        await refreshStatus(req, () => !cancelled);
+      } else if (!cancelled) {
+        setView("guest");
       }
     }
 
-    init();
+    void init();
 
     return () => {
       cancelled = true;
     };
   }, [refreshStatus]);
 
-  // Login flows can update browser storage without reloading this component.
+  /* ================= AUTH CHANGE LISTENERS ================= */
+
   useEffect(() => {
     const refresh = () => {
       const session = getSession();
+
       if (session && session.user.role.toLowerCase() !== "admin") {
         setMember(session.user);
         setView("member");
@@ -186,38 +218,47 @@ export default function NavbarAuth() {
         setView("guest");
       }
     };
+
     window.addEventListener(AUTH_CHANGE_EVENT, refresh);
     window.addEventListener("storage", refresh);
+
     return () => {
       window.removeEventListener(AUTH_CHANGE_EVENT, refresh);
       window.removeEventListener("storage", refresh);
     };
   }, []);
 
-  // Pending request status check
+  /* ================= PENDING REQUEST POLLING ================= */
+
   useEffect(() => {
     if (view !== "pending" || !saved) return;
 
-    const check = () => refreshStatus(saved);
-    const timer = setInterval(check, 20000);
+    const check = () => {
+      void refreshStatus(saved);
+    };
+
+    const timer = window.setInterval(check, 20000);
 
     window.addEventListener("focus", check);
 
     return () => {
-      clearInterval(timer);
+      window.clearInterval(timer);
       window.removeEventListener("focus", check);
     };
   }, [view, saved, refreshStatus]);
 
-  // Toast automatically hide
+  /* ================= TOAST ================= */
+
   useEffect(() => {
     if (!toast) return;
 
-    const timer = setTimeout(() => setToast(""), 5000);
-    return () => clearTimeout(timer);
+    const timer = window.setTimeout(() => setToast(""), 5000);
+
+    return () => window.clearTimeout(timer);
   }, [toast]);
 
-  // Button action
+  /* ================= BUTTON ACTION ================= */
+
   function handleButton() {
     if (view === "loading" || view === "guest") {
       router.push("/login");
@@ -230,36 +271,45 @@ export default function NavbarAuth() {
     }
   }
 
-  // Registration success
+  /* ================= REGISTRATION SUCCESS ================= */
+
   function handleRegistered(id: string, email: string) {
     const req = { id, email };
 
     saveRequest(req);
     setSaved(req);
     setView("pending");
+
+    // FIX: successful registration ke baad RegisterModal close hoga.
+    setModal("none");
+
     setToast("Request bhej di gayi! Admin jald aap se rabta karega.");
   }
 
-  // Member/Trainer login success
+  /* ================= LOGIN SUCCESS ================= */
+
   function handleLoggedIn(token: string, user: MemberUser, redirectTo: string) {
     const full = {
       ...user,
       dashboardPath: redirectTo,
     };
 
-    // Sirf Member/Trainer ka session save hoga
+    // Sirf Member/Trainer session save hoga.
     saveMember(token, full);
 
     clearRequest();
+
     setSaved(null);
     setMember(full);
     setView("member");
+    setMenuOpen(false);
     setModal("none");
 
     router.push(redirectTo);
   }
 
-  // Sirf Member/Trainer logout
+  /* ================= LOGOUT ================= */
+
   function logout() {
     clearSession();
 
@@ -267,22 +317,26 @@ export default function NavbarAuth() {
     setMenuOpen(false);
 
     const req = getSavedRequest();
-    setSaved(req);
 
+    setSaved(req);
     setView(req ? "pending" : "guest");
 
     if (req) {
-      refreshStatus(req);
+      void refreshStatus(req);
     }
   }
 
-  // Apply again
+  /* ================= APPLY AGAIN ================= */
+
   function applyAgain() {
     clearRequest();
+
     setSaved(null);
     setView("guest");
     setModal("register");
   }
+
+  /* ================= NAVBAR BUTTON ================= */
 
   const base = "rounded-lg px-5 py-2.5 text-base font-semibold transition";
 
@@ -292,7 +346,8 @@ export default function NavbarAuth() {
     button = (
       <div className="relative">
         <button
-          onClick={() => setMenuOpen(!menuOpen)}
+          type="button"
+          onClick={() => setMenuOpen((previous) => !previous)}
           className="flex items-center gap-2.5 rounded-lg py-1.5 pl-1.5 pr-3 ring-1 ring-[#800020]/20 transition hover:bg-[#800020]/5"
         >
           {member.photo ? (
@@ -319,7 +374,7 @@ export default function NavbarAuth() {
               <div
                 className="fixed inset-0 z-40"
                 onClick={() => setMenuOpen(false)}
-                aria-hidden
+                aria-hidden="true"
               />
             </Portal>
 
@@ -328,6 +383,7 @@ export default function NavbarAuth() {
                 <p className="text-sm font-bold text-[#800020]">
                   {member.name}
                 </p>
+
                 <p className="truncate text-xs text-[#800020]/60">
                   {member.email}
                 </p>
@@ -335,6 +391,7 @@ export default function NavbarAuth() {
 
               {member.dashboardPath && (
                 <button
+                  type="button"
                   onClick={() => {
                     setMenuOpen(false);
                     router.push(member.dashboardPath as string);
@@ -346,6 +403,7 @@ export default function NavbarAuth() {
               )}
 
               <button
+                type="button"
                 onClick={logout}
                 className="mt-1 w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-[#800020] transition hover:bg-[#800020] hover:text-white"
               >
@@ -359,6 +417,7 @@ export default function NavbarAuth() {
   } else if (view === "pending") {
     button = (
       <button
+        type="button"
         onClick={handleButton}
         className={`${base} flex items-center gap-2 bg-amber-100 text-amber-800 ring-1 ring-amber-300 hover:bg-amber-200`}
       >
@@ -372,6 +431,7 @@ export default function NavbarAuth() {
   } else if (view === "approved") {
     button = (
       <button
+        type="button"
         onClick={handleButton}
         className={`${base} bg-emerald-600 text-white hover:bg-emerald-700`}
       >
@@ -381,6 +441,7 @@ export default function NavbarAuth() {
   } else if (view === "rejected") {
     button = (
       <button
+        type="button"
         onClick={handleButton}
         className={`${base} bg-rose-50 text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100`}
       >
@@ -390,6 +451,7 @@ export default function NavbarAuth() {
   } else {
     button = (
       <button
+        type="button"
         onClick={handleButton}
         className={`${base} bg-[#800020] text-white hover:bg-[#5e0018]`}
       >
@@ -398,36 +460,45 @@ export default function NavbarAuth() {
     );
   }
 
+  /* ================= RENDER ================= */
+
   return (
     <>
       {button}
 
       <Portal>
-        <RegisterModal
-          open={modal === "register"}
-          onClose={() => setModal("none")}
-          onSuccess={handleRegistered}
-          onSwitchToLogin={() => setModal("login")}
-        />
+        {modal === "register" && (//below class is use to maintain the hieght of registration page
+          <div className="fixed inset-0 z-[60] overflow-y-auto bg-[#faf9f7]">
+            <RegisterModal
+              open={true}
+              onClose={() => setModal("none")}
+              onSuccess={handleRegistered}
+              onSwitchToLogin={() => setModal("login")}
+            />
+          </div>
+        )}
 
         <LoginModal
           open={modal === "login"}
           onClose={() => setModal("none")}
           onSuccess={handleLoggedIn}
           onSwitchToRegister={() => setModal("register")}
-          defaultEmail={saved?.email ?? ""}
+          defaultEmail=""
           approved={view === "approved"}
         />
 
         {modal === "pendingInfo" && (
           <InfoModal title="Request Pending" onClose={() => setModal("none")}>
             <p>
-              Your request has reached the admin. They will contact you soon
+              Your request has reached the admin. They will contact you soon.
             </p>
+
             <p className="mt-2">
-              If request accepted then the login button show here
+              If your request is accepted, the login button will appear here.
             </p>
+
             <button
+              type="button"
               onClick={() => setModal("none")}
               className="mt-5 w-full rounded-xl bg-[#800020] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#5e0018]"
             >
@@ -445,6 +516,7 @@ export default function NavbarAuth() {
 
             <div className="mt-5 flex gap-3">
               <button
+                type="button"
                 onClick={() => setModal("none")}
                 className="flex-1 rounded-xl px-4 py-2.5 text-sm font-bold text-[#800020] ring-1 ring-[#800020]/20 hover:bg-[#800020]/5"
               >
@@ -452,6 +524,7 @@ export default function NavbarAuth() {
               </button>
 
               <button
+                type="button"
                 onClick={applyAgain}
                 className="flex-1 rounded-xl bg-[#800020] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#5e0018]"
               >

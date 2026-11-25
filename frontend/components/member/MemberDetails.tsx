@@ -42,9 +42,17 @@ export default function MemberDetails({
 
         <div className="p-5 sm:p-7">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-[#641d32] text-2xl font-bold text-white shadow-sm">
-              {initials || "M"}
-            </div>
+            {member.photo ? (
+              <img
+                src={member.photo}
+                alt={`${member.name}'s profile`}
+                className="h-20 w-20 shrink-0 rounded-full border border-[#eadfd9] object-cover shadow-sm"
+              />
+            ) : (
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-[#641d32] text-2xl font-bold text-white shadow-sm">
+                {initials || "M"}
+              </div>
+            )}
 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-3">

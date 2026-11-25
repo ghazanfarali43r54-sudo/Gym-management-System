@@ -291,7 +291,11 @@ exports.updateTrainer = async (req, res) => {
 };
 
 // DELETE TRAINER
+
+// PERMANENT DELETE TRAINER
 exports.deleteTrainer = async (req, res) => {
+  const session = await mongoose.startSession();
+
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({
@@ -300,54 +304,73 @@ exports.deleteTrainer = async (req, res) => {
       });
     }
 
-    const trainer = await User.findOne({
-      _id: req.params.id,
-      role: "trainer",
-      isDeleted: { $ne: true },
-    });
+    let result = null;
 
-    if (!trainer) {
-      return res.status(404).json({
-        success: false,
-        message: "Trainer not found",
-      });
-    }
+    await session.withTransaction(async () => {
+      // Find trainer
+      const trainer = await User.findOne({
+        _id: req.params.id,
+        role: "trainer",
+        isDeleted: { $ne: true },
+      }).session(session);
 
-    const assignedMemberCount = await MemberData.countDocuments({
-      assignedTrainer: trainer._id,
-    });
-
-    if (assignedMemberCount > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `This trainer has ${assignedMemberCount} assigned member(s). Reassign or remove those members before deleting this trainer.`,
-        assignedMemberCount,
-      });
-    }
-
-    await User.updateOne(
-      { _id: trainer._id, role: "trainer" },
-      {
-        $set: {
-          isDeleted: true,
-          deletedAt: new Date(),
-        },
+      if (!trainer) {
+        result = {
+          status: 404,
+          message: "Trainer not found",
+        };
+        return;
       }
-    );
 
-    return res.status(200).json({
-      success: true,
-      message: "Trainer deleted successfully",
+      // Check assigned members
+      const assignedMemberCount = await MemberData.countDocuments({
+        assignedTrainer: trainer._id,
+      }).session(session);
+
+      if (assignedMemberCount > 0) {
+        result = {
+          status: 400,
+          message: `This trainer has ${assignedMemberCount} assigned member(s). Reassign or remove those members before deleting this trainer.`,
+          assignedMemberCount,
+        };
+        return;
+      }
+
+      // Delete trainer profile
+      await TrainerData.deleteMany({
+        trainerId: trainer._id,
+      }).session(session);
+
+      // Permanently delete trainer account
+      const deletedTrainer = await User.deleteOne({
+        _id: trainer._id,
+        role: "trainer",
+      }).session(session);
+
+      if (deletedTrainer.deletedCount !== 1) {
+        throw new Error("Trainer account could not be deleted");
+      }
+
+      result = {
+        status: 200,
+        success: true,
+        message: "Trainer permanently deleted successfully",
+      };
     });
+
+    return res.status(result.status).json(result);
   } catch (error) {
-    console.error("Delete trainer error:", error);
+    console.error("Permanent delete trainer error:", error);
 
     return res.status(500).json({
       success: false,
-      message: "Server error",
+      message: "Failed to permanently delete trainer",
     });
+  } finally {
+    await session.endSession();
   }
 };
+
 
 // GET SELECTED TRAINER DASHBOARD
 exports.getTrainerDashboard = async (req, res) => {

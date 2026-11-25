@@ -33,11 +33,25 @@ export default function MemberFitnessEntry() {
             {loading ? (
               <p className="mt-3 text-sm text-[#8b7771]">Loading member…</p>
             ) : member ? (
-              <div className="mt-4 border-t border-[#eee5e0] pt-4">
-                <p className="font-semibold text-[#4b1725]">{member.name}</p>
-                <p className="mt-1 break-all text-sm text-[#8b7771]">
-                  {member.email || "No email provided"}
-                </p>
+              <div className="mt-4 flex items-center gap-4 border-t border-[#eee5e0] pt-4">
+                {member.photo ? (
+                  <img
+                    src={member.photo}
+                    alt={`${member.name}'s profile`}
+                    className="h-16 w-16 shrink-0 rounded-full border border-[#eadfd9] object-cover"
+                  />
+                ) : (
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[#641d32] text-xl font-bold text-white">
+                    {member.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+
+                <div className="min-w-0">
+                  <p className="font-semibold text-[#4b1725]">{member.name}</p>
+                  <p className="mt-1 break-all text-sm text-[#8b7771]">
+                    {member.email || "No email provided"}
+                  </p>
+                </div>
               </div>
             ) : null}
           </header>
@@ -54,6 +68,7 @@ export default function MemberFitnessEntry() {
           <MemberFitnessComparison
             memberId={member.id}
             memberName={member.name}
+            memberPhoto={member.photo || ""}
           />
         ) : null}
         {!loading && member && (isMeasurement || isAssessment) ? (
