@@ -134,7 +134,7 @@ export default function UniversalLogin() {
     handleSubmit,
   } = useAuthLogin();
 
-  const gymName = settings.general.gymName || "GymMaster Pro";
+  const gymName = settings.general.gymName || "Gym Fitness Pro";
 
   return (
     <main className="min-h-screen bg-[#faf9f7] px-4 py-8 text-[#4b4b4b] sm:px-6">
@@ -143,7 +143,7 @@ export default function UniversalLogin() {
       <div className="fixed right-5 top-5 z-10 sm:right-8 sm:top-7">
         <div className="flex items-center gap-2 rounded-full border border-[#e8e4df] bg-white px-4 py-2.5 text-sm font-medium text-[#555] shadow-sm">
           <ShieldIcon />
-          <span>Gym Fitness Portal</span>
+        <span>{settings.general.gymName || "Gym Fitness"} Portal</span>
         </div>
       </div>
 
