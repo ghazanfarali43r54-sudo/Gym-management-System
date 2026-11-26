@@ -194,7 +194,7 @@ export default function MemberList({
         />
       </div>
 
-      <div className="flex flex-col gap-3 rounded-2xl border border-[#eadfd9] bg-white p-4 shadow-sm sm:flex-row">
+      {/* <div className="flex flex-col gap-3 rounded-2xl border border-[#eadfd9] bg-white p-4 shadow-sm sm:flex-row">
         <input
           type="text"
           value={search}
@@ -214,7 +214,7 @@ export default function MemberList({
           <option value="Inactive">Inactive</option>
           <option value="Pending">Pending</option>
         </select>
-      </div>
+      </div> */}
 
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -223,12 +223,39 @@ export default function MemberList({
       )}
 
       <div className="overflow-visible rounded-2xl border border-[#eadfd9] bg-white shadow-sm">
-        <div className="border-b border-[#eee5e0] px-5 py-4">
-          <h2 className="font-bold text-[#4b1725]">All Members</h2>
-          <p className="mt-1 text-xs text-[#8b7771]">
-            Click a member to view their details.
-          </p>
-        </div>
+        <div className="flex flex-col gap-4 border-b border-[#eee5e0] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+  {/* Left: Heading */}
+  <div className="shrink-0">
+    <h2 className="font-bold text-[#4b1725]">All Members</h2>
+    <p className="mt-1 text-xs text-[#8b7771]">
+      Click a member to view their details.
+    </p>
+  </div>
+
+  {/* Right: Search + Status */}
+  <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+    <input
+      type="text"
+      value={search}
+      onChange={(event) => setSearch(event.target.value)}
+      placeholder="Search by name, email or phone..."
+      className="min-w-0 flex-1 rounded-xl border border-[#e7dcd6] bg-[#fffdfa] px-4 py-3 text-sm outline-none focus:border-[#641d32] sm:w-64"
+    />
+
+    <select
+      value={statusFilter}
+      onChange={(event) =>
+        setStatusFilter(event.target.value as MemberStatusFilter)
+      }
+      className="rounded-xl border border-[#e7dcd6] bg-[#fffdfa] px-4 py-3 text-sm outline-none focus:border-[#641d32]"
+    >
+      <option value="All">All Statuses</option>
+      <option value="Active">Active</option>
+      <option value="Inactive">Inactive</option>
+      <option value="Pending">Pending</option>
+    </select>
+  </div>
+</div>
 
         {loading ? (
           <div className="p-10 text-center text-sm text-[#8b7771]">
