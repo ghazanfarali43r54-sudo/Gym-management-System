@@ -1,23 +1,41 @@
 
 import { apiFetch } from "@/lib/api";
-import type { ApiResponse, Trainer } from "@/types/trainer.types";
 
-function mapTrainer(item: NonNullable<ApiResponse["trainers"]>[number]): Trainer {
+import type {
+  ApiResponse,
+  ApiTrainer,
+  Trainer,
+} from "@/types/trainer.types";
+
+// Convert backend trainer data into frontend Trainer type.
+function mapTrainer(item: ApiTrainer): Trainer {
   return {
     id: item._id,
     name: item.name || "",
     email: item.email || "",
     phone: item.phone || "",
+    photo: item.photo || "",
+    gender: item.gender || "",
+    dateOfBirth: item.dateOfBirth
+      ? String(item.dateOfBirth).slice(0, 10)
+      : "",
+    address: {
+      street: item.address?.street || "",
+      city: item.address?.city || "",
+      country: item.address?.country || "",
+    },
     specialization: item.specialization || "",
-    experience: item.experience || 0,
+    experience: Number(item.experience ?? 0),
     status: item.status === "active" ? "Active" : "Inactive",
     memberLimit: Number(item.memberLimit ?? 20),
     assignedMemberCount: Number(item.assignedMemberCount ?? 0),
   };
 }
 
+// GET ALL TRAINERS
 export async function getTrainers(): Promise<Trainer[]> {
   const result = await apiFetch("/api/admin/trainers");
+
   const data = result.data as ApiResponse;
 
   if (!result.ok) {
@@ -27,33 +45,42 @@ export async function getTrainers(): Promise<Trainer[]> {
   return (data.trainers || []).map(mapTrainer);
 }
 
+// ADD / UPDATE TRAINER
 export async function saveTrainer(
   id: string | null,
-  payload: Record<string, unknown>
+  payload: FormData | Record<string, unknown>
 ): Promise<void> {
+  const isFormData = payload instanceof FormData;
+
   const result = await apiFetch(
     id ? `/api/admin/trainers/${id}` : "/api/admin/trainers",
     {
       method: id ? "PUT" : "POST",
-      body: JSON.stringify(payload),
+      body: isFormData ? payload : JSON.stringify(payload),
     }
   );
 
   if (!result.ok) {
-    throw new Error(result.data?.message || "Unable to save trainer");
+    throw new Error(
+      result.data?.message || "Unable to save trainer"
+    );
   }
 }
 
+// DELETE TRAINER
 export async function deleteTrainer(id: string): Promise<void> {
   const result = await apiFetch(`/api/admin/trainers/${id}`, {
     method: "DELETE",
   });
 
   if (!result.ok) {
-    throw new Error(result.data?.message || "Unable to delete trainer");
+    throw new Error(
+      result.data?.message || "Unable to delete trainer"
+    );
   }
 }
 
+// UPDATE TRAINER STATUS
 export async function updateTrainerStatus(
   id: string,
   status: "active" | "inactive"
@@ -64,6 +91,8 @@ export async function updateTrainerStatus(
   });
 
   if (!result.ok) {
-    throw new Error(result.data?.message || "Unable to update status");
+    throw new Error(
+      result.data?.message || "Unable to update trainer status"
+    );
   }
 }

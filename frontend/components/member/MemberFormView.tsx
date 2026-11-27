@@ -1,7 +1,12 @@
+
 "use client";
 
-import Image from "next/image";
 import { useMemberForm } from "@/hooks/memberHooks";
+
+import PersonPhotoUpload from "@/components/shared/forms/PersonPhotoUpload";
+import PersonBasicFields from "@/components/shared/forms/PersonBasicFields";
+import PersonAddressFields from "@/components/shared/forms/PersonAddressFields";
+
 import type {
   Member,
   MemberForm,
@@ -27,6 +32,7 @@ export default function MemberFormView({
   onSaved,
 }: MemberFormViewProps) {
   const { state, actions } = useMemberForm({ member, onSaved });
+
   const {
     editingMember,
     form,
@@ -39,6 +45,7 @@ export default function MemberFormView({
     submitting,
     today,
   } = state;
+
   const {
     handleSubmit,
     updateField,
@@ -47,6 +54,7 @@ export default function MemberFormView({
     toggleMembershipPlan,
     changeTrainer,
   } = actions;
+
   const fieldError = (field: string) =>
     fieldErrors[field] ? (
       <p className="mt-1 text-xs text-red-700" role="alert">
@@ -56,8 +64,7 @@ export default function MemberFormView({
 
   return (
     <section className="min-h-screen space-y-6 bg-[#f8f6f2] p-4 text-[#342323] sm:p-6">
-      <div className="mx-auto w-full max-w-7xl bg">
-        {/* Scrollable form area */}
+      <div className="mx-auto w-full max-w-7xl">
         <div className="rounded-2xl border border-[#eadfd9] bg-white p-5 shadow-sm sm:p-8">
           <form onSubmit={handleSubmit} noValidate className="space-y-6">
             {error && (
@@ -66,233 +73,42 @@ export default function MemberFormView({
               </div>
             )}
 
-            <div className="mb-6 rounded-xl border border-[#e7dcd6] bg-[#fffdfa] p-4">
-              <div className="flex items-center justify-between gap-4">
-                {/* Left Side: Profile Picture */}
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#f3eae5] text-xl font-bold text-[#641d32]">
-                  {photo ? (
-                    <Image
-                      src={photo}
-                      alt="Member profile preview"
-                      width={64}
-                      height={64}
-                      unoptimized
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    form.name.trim().charAt(0).toUpperCase() || "M"
-                  )}
-                </div>
+            {/* Reusable Profile Photo */}
+            <PersonPhotoUpload
+              photo={photo}
+              name={form.name}
+              editing={Boolean(editingMember)}
+              personType="Member"
+              photoError={photoError}
+              fieldError={fieldError}
+              onPhoto={(file) => {
+                void handlePhoto(file);
+              }}
+              onRemove={removePhoto}
+            />
 
-                {/* Right Side Content */}
-                <div className="min-w-0 flex-1">
-                  {/* Heading on Right */}
-                  <h2 className="text-right text-lg pr-10 font-bold text-[#4b1725]">
-                    {editingMember ? "Edit Member" : "Add New Member"}
-                  </h2>
-
-                  {/* Upload Details - Left Aligned */}
-                  <div className="mt-1 flex items-center justify-between">
-                    <p className="text-xs text-[#8b7771]">
-                      Profile Picture (Optional)
-                    </p>
-
-                    <p className="text-xs text-[#8b7771]">
-                      {editingMember
-                        ? "Update member information"
-                        : "Enter details to register a new member."}
-                    </p>
-                  </div>
-
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={(event) => {
-                      void handlePhoto(event.target.files?.[0]);
-                      event.target.value = "";
-                    }}
-                    className="mt-2 block w-full text-sm"
-                  />
-
-                  <p className="mt-1 text-xs text-[#8b7771]">
-                    PNG, JPG or WEBP, maximum 2 MB.
-                  </p>
-
-                  {photo && (
-                    <button
-                      type="button"
-                      onClick={removePhoto}
-                      className="mt-1 text-xs font-semibold text-[#641d32] underline"
-                    >
-                      Remove photo
-                    </button>
-                  )}
-
-                  {photoError && (
-                    <p className="mt-1 text-xs text-red-700">{photoError}</p>
-                  )}
-
-                  {fieldError("photo")}
-                </div>
-              </div>
-            </div>
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
-              {/* Full Name */}
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[#4b1725]">
-                  Full Name *
-                </label>
-                <input
-                  required
-                  type="text"
-                  autoComplete="name"
-                  value={form.name}
-                  onChange={(event) => updateField("name", event.target.value)}
-                  placeholder="Enter full name"
-                  className="w-full rounded-xl border border-[#e7dcd6] bg-white px-4 py-3 text-sm outline-none focus:border-[#641d32]"
-                />
-                {fieldError("name")}
-              </div>
+              {/* Reusable Basic Information */}
+              <PersonBasicFields
+                form={form}
+                editing={Boolean(editingMember)}
+                today={today}
+                fieldError={fieldError}
+                updateField={(field, value) =>
+                  updateField(field as keyof MemberForm, value)
+                }
+              />
 
-              {/* Email */}
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[#4b1725]">
-                  Email Address *
-                </label>
-                <input
-                  required
-                  type="email"
-                  autoComplete="email"
-                  value={form.email}
-                  onChange={(event) => updateField("email", event.target.value)}
-                  placeholder="Enter email address"
-                  className="w-full rounded-xl border border-[#e7dcd6] bg-white px-4 py-3 text-sm outline-none focus:border-[#641d32]"
-                />
-                {fieldError("email")}
-              </div>
+              {/* Reusable Address */}
+              <PersonAddressFields
+                form={form}
+                fieldError={fieldError}
+                updateField={(field, value) =>
+                  updateField(field as keyof MemberForm, value)
+                }
+              />
 
-              {/* Phone */}
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[#4b1725]">
-                  Phone Number *
-                </label>
-                <input
-                  required
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={15}
-                  autoComplete="tel"
-                  value={form.phone}
-                  onChange={(event) => updateField("phone", event.target.value)}
-                  placeholder="Enter phone number"
-                  className="w-full rounded-xl border border-[#e7dcd6] bg-white px-4 py-3 text-sm outline-none focus:border-[#641d32]"
-                />
-                {fieldError("phone")}
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[#4b1725]">
-                  Password {editingMember ? "(Optional)" : "*"}
-                </label>
-                <input
-                  required={!editingMember}
-                  type="password"
-                  minLength={6}
-                  maxLength={72}
-                  autoComplete="new-password"
-                  name="password"
-                  value={form.password}
-                  onChange={(event) =>
-                    updateField("password", event.target.value)
-                  }
-                  placeholder={
-                    editingMember
-                      ? "Leave blank to keep current password"
-                      : "At least 6 characters"
-                  }
-                  className="w-full rounded-xl border border-[#e7dcd6] bg-white px-4 py-3 text-sm outline-none focus:border-[#641d32]"
-                />
-                {fieldError("password")}
-              </div>
-
-              {!editingMember && (
-                <div>
-                  <label className="mb-2 block text-sm font-semibold text-[#4b1725]">
-                    Confirm Password *
-                  </label>
-                  <input
-                    required
-                    type="password"
-                    minLength={6}
-                    maxLength={72}
-                    autoComplete="new-password"
-                    value={form.confirmPassword}
-                    onChange={(event) =>
-                      updateField("confirmPassword", event.target.value)
-                    }
-                    placeholder="Confirm password"
-                    className="w-full rounded-xl border border-[#e7dcd6] bg-white px-4 py-3 text-sm outline-none focus:border-[#641d32]"
-                  />
-                  {fieldError("confirmPassword")}
-                </div>
-              )}
-
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[#4b1725]">
-                  Date of Birth
-                </label>
-                <input
-                  type="date"
-                  value={form.dateOfBirth}
-                  max={today || undefined}
-                  onChange={(event) =>
-                    updateField("dateOfBirth", event.target.value)
-                  }
-                  className="w-full rounded-xl border border-[#e7dcd6] bg-white px-4 py-3 text-sm outline-none focus:border-[#641d32]"
-                />
-                {fieldError("dateOfBirth")}
-              </div>
-              <div>
-                <label className="mb-2 block text-sm font-semibold text-[#4b1725]">
-                  Gender
-                </label>
-                <select
-                  value={form.gender}
-                  onChange={(event) =>
-                    updateField("gender", event.target.value)
-                  }
-                  className="w-full rounded-xl border border-[#e7dcd6] bg-white px-4 py-3 text-sm outline-none focus:border-[#641d32]"
-                >
-                  <option value="">Select gender</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-                {fieldError("gender")}
-              </div>
-              <div className="md:col-span-2 border-t border-[#eadfd9] pt-4">
-                <h3 className="font-semibold text-[#4b1725]">Address</h3>
-              </div>
-              {[
-                ["street", "Street"],
-                ["city", "City"],
-                ["country", "Country"],
-              ].map(([key, label]) => (
-                <div key={key}>
-                  <label className="mb-2 block text-sm font-semibold text-[#4b1725]">
-                    {label}
-                  </label>
-                  <input
-                    value={form[key as keyof MemberForm] as string}
-                    onChange={(event) =>
-                      updateField(key as keyof MemberForm, event.target.value)
-                    }
-                    maxLength={key === "street" ? 150 : 100}
-                    className="w-full rounded-xl border border-[#e7dcd6] bg-white px-4 py-3 text-sm outline-none focus:border-[#641d32]"
-                  />
-                  {fieldError(key)}
-                </div>
-              ))}
+              {/* Member-specific Emergency Contact */}
               <div className="md:col-span-2 border-t border-[#eadfd9] pt-4">
                 <h3 className="font-semibold text-[#4b1725]">
                   Emergency Contact{" "}
@@ -301,6 +117,7 @@ export default function MemberFormView({
                   </span>
                 </h3>
               </div>
+
               {(
                 [
                   ["emergencyName", "Name"],
@@ -312,10 +129,13 @@ export default function MemberFormView({
                   <label className="mb-2 block text-sm font-semibold text-[#4b1725]">
                     {label}
                   </label>
+
                   <input
                     type={key === "emergencyPhone" ? "tel" : "text"}
                     value={form[key]}
-                    onChange={(event) => updateField(key, event.target.value)}
+                    onChange={(event) =>
+                      updateField(key, event.target.value)
+                    }
                     maxLength={
                       key === "emergencyName"
                         ? 60
@@ -325,10 +145,12 @@ export default function MemberFormView({
                     }
                     className="w-full rounded-xl border border-[#e7dcd6] bg-white px-4 py-3 text-sm outline-none focus:border-[#641d32]"
                   />
+
                   {fieldError(key)}
                 </div>
               ))}
 
+              {/* Member-specific Membership Plans */}
               <div className="md:col-span-2 border-t border-[#eadfd9] pt-4">
                 <h3 className="font-semibold text-[#4b1725]">
                   Membership Plans{" "}
@@ -336,6 +158,7 @@ export default function MemberFormView({
                     (Optional, select any active plans)
                   </span>
                 </h3>
+
                 {(() => {
                   const currentInactivePlans =
                     editingMember?.membershipPlans.filter(
@@ -345,10 +168,12 @@ export default function MemberFormView({
                           (active) => active._id === plan._id
                         )
                     ) || [];
+
                   const visiblePlans = [
                     ...membershipPlans,
                     ...currentInactivePlans,
                   ];
+
                   return visiblePlans.length === 0 ? (
                     <p className="mt-2 text-sm text-[#8b7771]">
                       No active plans available.
@@ -375,10 +200,12 @@ export default function MemberFormView({
                             }
                             className="mt-1 accent-[#641d32]"
                           />
+
                           <span>
                             <span className="block text-sm font-semibold text-[#4b1725]">
                               {plan.name}
                             </span>
+
                             <span className="text-xs text-[#8b7771]">
                               {plan.status === "inactive"
                                 ? "Inactive · currently assigned"
@@ -394,10 +221,11 @@ export default function MemberFormView({
                     </div>
                   );
                 })()}
+
                 {fieldError("membershipPlanIds")}
               </div>
 
-              {/* Optional Trainer Assignment */}
+              {/* Member-specific Trainer Assignment */}
               <div>
                 <label className="mb-2 block text-sm font-semibold text-[#4b1725]">
                   Assign Trainer
@@ -420,14 +248,18 @@ export default function MemberFormView({
 
                   {trainers.map((trainer) => {
                     const count =
-                      trainer.assignedMemberCount ?? trainer.assignedCount ?? 0;
+                      trainer.assignedMemberCount ??
+                      trainer.assignedCount ??
+                      0;
 
                     const limit = trainer.memberLimit ?? 20;
 
-                    const isFull = trainer.isFull === true || count >= limit;
+                    const isFull =
+                      trainer.isFull === true || count >= limit;
 
                     const isCurrent =
                       editingMember?.assignedTrainerId === trainer._id;
+
                     const isInactive = trainer.status === "inactive";
 
                     return (
@@ -435,7 +267,8 @@ export default function MemberFormView({
                         key={trainer._id}
                         value={trainer._id}
                         disabled={
-                          (isFull && !isCurrent) || (isInactive && !isCurrent)
+                          (isFull && !isCurrent) ||
+                          (isInactive && !isCurrent)
                         }
                       >
                         {trainer.name} ({count}/{limit} members)
@@ -445,6 +278,7 @@ export default function MemberFormView({
                     );
                   })}
                 </select>
+
                 {fieldError("assignedTrainerId")}
 
                 <p className="mt-2 text-xs text-[#8b7771]">
@@ -454,11 +288,12 @@ export default function MemberFormView({
                 </p>
               </div>
 
-              {/* Status */}
+              {/* Member Status */}
               <div>
                 <label className="mb-2 block text-sm font-semibold text-[#4b1725]">
                   Status
                 </label>
+
                 <select
                   value={form.status}
                   onChange={(event) =>
@@ -470,11 +305,12 @@ export default function MemberFormView({
                   <option value="Inactive">Inactive</option>
                   <option value="Pending">Pending</option>
                 </select>
+
                 {fieldError("status")}
               </div>
             </div>
 
-            {/* Bottom actions */}
+            {/* Bottom Actions */}
             <div className="flex flex-col-reverse gap-3 border-t border-[#eadfd9] pt-6 sm:flex-row sm:justify-end">
               <button
                 type="button"

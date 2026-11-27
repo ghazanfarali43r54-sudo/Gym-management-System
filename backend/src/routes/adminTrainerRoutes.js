@@ -1,4 +1,5 @@
 const express = require("express");
+const upload = require("../middlewares/upload");
 
 const {
   getTrainers,
@@ -17,6 +18,8 @@ const router = express.Router();
 
 router.use(protect, adminOnly);
 
+router.post("/", upload.single("photo"), addTrainer);
+router.put("/:id", upload.single("photo"), updateTrainer);
 router.get("/:id/dashboard", getTrainerDashboard);
 router.get("/", getTrainers);
 router.post("/", addTrainer);

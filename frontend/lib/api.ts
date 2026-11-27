@@ -15,7 +15,6 @@ export function getAdminToken(): string | null {
   return session?.user.role.toLowerCase() === "admin" ? session.token : null;
 }
 
-
 // Clear the current admin session
 export function clearAdminSession(): void {
   if (typeof window === "undefined") return;
@@ -24,8 +23,8 @@ export function clearAdminSession(): void {
 }
 
 type ApiOptions = {
-  method?: string;  
-  body?: string;
+  method?: string;
+  body?: string | FormData;
 };
 
 async function request(

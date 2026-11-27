@@ -1,4 +1,3 @@
-
 import type { Trainer, TrainerForm } from "@/types/trainer.types";
 
 import {
@@ -12,27 +11,37 @@ export const emptyTrainerForm: TrainerForm = {
   name: "",
   email: "",
   phone: "",
+  password: "",
+  confirmPassword: "",
+  gender: "",
+  dateOfBirth: "",
+  street: "",
+  city: "",
+  country: "",
   specialization: "",
   experience: "",
-  password: "",
   status: "Active",
   memberLimit: "20",
 };
-
 
 export function buildTrainerForm(trainer: Trainer): TrainerForm {
   return {
     name: trainer.name,
     email: trainer.email,
     phone: trainer.phone,
+    password: "",
+    confirmPassword: "",
+    gender: trainer.gender || "",
+    dateOfBirth: trainer.dateOfBirth || "",
+    street: trainer.address?.street || "",
+    city: trainer.address?.city || "",
+    country: trainer.address?.country || "",
     specialization: trainer.specialization,
     experience: String(trainer.experience || ""),
-    password: "",
     status: trainer.status,
     memberLimit: String(trainer.memberLimit ?? 20),
   };
 }
-
 // Trainer initials
 export function initials(name: string): string {
   return name
@@ -57,10 +66,7 @@ export function validateTrainerForm(
   }
 
   const phoneMessage = phoneError(form.phone, false);
-
-  if (phoneMessage) {
-    return phoneMessage;
-  }
+  if (phoneMessage) return phoneMessage;
 
   if (
     form.experience.trim() !== "" &&
@@ -76,8 +82,19 @@ export function validateTrainerForm(
     return "Member limit must be a positive whole number.";
   }
 
+  // Password validation
   if (!isEditing && form.password.length < 6) {
-    return "Password must be at least 6 characters";
+    return "Password must be at least 6 characters.";
+  }
+
+  if (form.password && form.password.length < 6) {
+    return "Password must be at least 6 characters.";
+  }
+
+  if (!isEditing || form.password) {
+    if (form.password !== form.confirmPassword) {
+      return "Password and confirm password do not match.";
+    }
   }
 
   return null;
@@ -85,18 +102,44 @@ export function validateTrainerForm(
 
 // Trainer payload builder
 export function buildTrainerPayload(
-  form: TrainerForm
-): Record<string, unknown> {
-  return {
-    name: form.name.trim(),
-    email: form.email.trim().toLowerCase(),
-    phone: form.phone.trim(),
-    specialization: form.specialization.trim(),
-    experience: Number(form.experience),
-    status: form.status.toLowerCase(),
-    memberLimit: Number(form.memberLimit),
-    ...(form.password.trim() && {
-      password: form.password,
-    }),
-  };
+  form: TrainerForm,
+  selectedPhoto: File | null,
+  photoRemoved: boolean
+): FormData {
+  const payload = new FormData();
+
+  payload.append("name", form.name.trim());
+  payload.append("email", form.email.trim().toLowerCase());
+  payload.append("phone", form.phone.trim());
+
+  if (form.password.trim()) {
+    payload.append("password", form.password);
+  }
+
+  payload.append("gender", form.gender);
+  payload.append("dateOfBirth", form.dateOfBirth);
+
+  payload.append(
+    "address",
+    JSON.stringify({
+      street: form.street.trim(),
+      city: form.city.trim(),
+      country: form.country.trim(),
+    })
+  );
+
+  payload.append("specialization", form.specialization.trim());
+  payload.append("experience", String(Number(form.experience)));
+  payload.append("status", form.status.toLowerCase());
+  payload.append("memberLimit", String(Number(form.memberLimit)));
+
+  if (selectedPhoto) {
+    payload.append("photo", selectedPhoto);
+  }
+
+  if (photoRemoved) {
+    payload.append("removePhoto", "true");
+  }
+
+  return payload;
 }

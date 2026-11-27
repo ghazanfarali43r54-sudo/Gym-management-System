@@ -43,7 +43,7 @@ export function useTrainers() {
   const saveTrainerData = useCallback(
     async (
       id: string | null,
-      payload: Record<string, unknown>
+      payload: FormData | Record<string, unknown>
     ): Promise<boolean> => {
       setSaving(true);
       setErrorMessage("");
@@ -118,7 +118,6 @@ export function useTrainers() {
     [fetchTrainers]
   );
 
-  // Initial API call
   // Initial API call
   useEffect(() => {
     let isMounted = true;

@@ -2,6 +2,10 @@ const {User} = require("../models/user");
 const TrainerData = require("../models/Trainer");
 const MemberData = require("../models/Member");
 const mongoose = require("mongoose");
+const {
+  uploadToCloudinary,
+  deleteFromCloudinary,
+} = require("../utils/cloudinaryUpload");
 
 // GET ALL ACTIVE AND INACTIVE TRAINERS
 exports.getTrainers = async (req, res) => {
@@ -11,7 +15,9 @@ exports.getTrainers = async (req, res) => {
       status: { $in: ["active", "inactive"] },
       isDeleted: { $ne: true },
     })
-      .select("name email phone specialization experience status createdAt")
+      .select(
+        "name email phone photo gender dateOfBirth status createdAt"
+      )
       .sort({ name: 1 })
       .lean();
 
@@ -19,36 +25,38 @@ exports.getTrainers = async (req, res) => {
 
     const trainerDataList = await TrainerData.find({
       trainerId: { $in: trainerIds },
-    });
+      isDeleted: { $ne: true },
+    }).lean();
 
-    const trainerDataMap = {};
+    const trainerDataMap = new Map();
 
     trainerDataList.forEach((data) => {
-      trainerDataMap[data.trainerId.toString()] = data;
-    });
-
-    trainers.forEach((trainer) => {
-      const data = trainerDataMap[trainer._id.toString()];
-
-      if (data) {
-        trainer.specialization = data.specialization || "";
-        trainer.experience = data.experience || 0;
-        trainer.bio = data.bio || "";
-        trainer.memberLimit = data.memberLimit ?? 20;
-      }
+      trainerDataMap.set(String(data.trainerId), data);
     });
 
     const trainersWithCount = await Promise.all(
       trainers.map(async (trainer) => {
+        const data = trainerDataMap.get(String(trainer._id));
+
         const assignedMemberCount = await MemberData.countDocuments({
           assignedTrainer: trainer._id,
         });
 
+        const memberLimit = Number(data?.memberLimit ?? 20);
+
         return {
           ...trainer,
+          specialization: data?.specialization || "",
+          experience: data?.experience || 0,
+          bio: data?.bio || "",
+          address: data?.address || {
+            street: "",
+            city: "",
+            country: "",
+          },
+          memberLimit,
           assignedMemberCount,
-          memberLimit: Number(trainer.memberLimit ?? 20),
-          isFull: assignedMemberCount >= Number(trainer.memberLimit ?? 20),
+          isFull: assignedMemberCount >= memberLimit,
         };
       })
     );
@@ -70,12 +78,46 @@ exports.getTrainers = async (req, res) => {
 
 // ADD TRAINER
 exports.addTrainer = async (req, res) => {
+  let createdUser = null;
+  let uploadedPhoto = null;
+
   try {
-    const { name, email, password, phone, specialization, experience, status } =
-      req.body;
-    const requestedLimit = req.body.memberLimit === undefined ? 20 : Number(req.body.memberLimit);
-    if (!Number.isInteger(requestedLimit) || requestedLimit < 1) {
-      return res.status(400).json({ success: false, message: "Member limit must be a positive whole number" });
+    const {
+      name,
+      email,
+      password,
+      phone,
+      specialization,
+      experience,
+      status,
+      gender,
+      dateOfBirth,
+    } = req.body;
+
+    let address = {};
+
+    try {
+      address =
+        typeof req.body.address === "string"
+          ? JSON.parse(req.body.address)
+          : req.body.address || {};
+    } catch {
+      return res.status(422).json({
+        success: false,
+        message: "Invalid address data",
+      });
+    }
+
+    const requestedLimit =
+      req.body.memberLimit === undefined
+        ? 20
+        : Number(req.body.memberLimit);
+
+    if (!Number.isSafeInteger(requestedLimit) || requestedLimit < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Member limit must be a positive whole number",
+      });
     }
 
     if (!name || !email || !password) {
@@ -105,23 +147,47 @@ exports.addTrainer = async (req, res) => {
       });
     }
 
-    const trainer = await User.create({
+    // Validate date of birth.
+    let parsedDateOfBirth = null;
+
+    if (dateOfBirth) {
+      parsedDateOfBirth = new Date(dateOfBirth);
+
+      if (Number.isNaN(parsedDateOfBirth.getTime())) {
+        return res.status(422).json({
+          success: false,
+          message: "Invalid date of birth",
+        });
+      }
+    }
+
+    // Upload profile photo.
+    if (req.file) {
+      uploadedPhoto = await uploadToCloudinary(req.file.buffer);
+    }
+
+    createdUser = await User.create({
       name: name.trim(),
       email: normalizedEmail,
       password,
-      phone,
+      phone: phone?.trim() || "",
+      gender: gender ? gender.toLowerCase() : "",
+      dateOfBirth: parsedDateOfBirth,
+      photo: uploadedPhoto?.url || "",
+      photoPublicId: uploadedPhoto?.publicId || "",
       status: status === "inactive" ? "inactive" : "active",
       role: "trainer",
     });
 
-    await TrainerData.create({
-      trainerId: trainer._id,
+    const trainerProfile = await TrainerData.create({
+      trainerId: createdUser._id,
       specialization: specialization || "",
       experience: String(Number(experience) || 0),
       memberLimit: requestedLimit,
+      address,
     });
 
-    const trainerData = trainer.toObject();
+    const trainerData = createdUser.toObject();
     delete trainerData.password;
 
     return res.status(201).json({
@@ -129,12 +195,33 @@ exports.addTrainer = async (req, res) => {
       message: "Trainer added successfully",
       trainer: {
         ...trainerData,
+        specialization: trainerProfile.specialization,
+        experience: trainerProfile.experience,
+        address: trainerProfile.address,
         assignedMemberCount: 0,
         memberLimit: requestedLimit,
         isFull: false,
       },
     });
   } catch (error) {
+    if (createdUser?._id) {
+      await User.deleteOne({ _id: createdUser._id }).catch(() => {});
+      await TrainerData.deleteOne({
+        trainerId: createdUser._id,
+      }).catch(() => {});
+    }
+
+    if (uploadedPhoto?.publicId) {
+      await deleteFromCloudinary(uploadedPhoto.publicId).catch(() => {});
+    }
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Email already exists",
+      });
+    }
+
     console.error("Add trainer error:", error);
 
     return res.status(500).json({
@@ -146,6 +233,9 @@ exports.addTrainer = async (req, res) => {
 
 // UPDATE TRAINER
 exports.updateTrainer = async (req, res) => {
+  let uploadedPhoto = null;
+  let databaseUpdated = false;
+
   try {
     const {
       name,
@@ -156,6 +246,8 @@ exports.updateTrainer = async (req, res) => {
       status,
       password,
       memberLimit,
+      gender,
+      dateOfBirth,
     } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -168,6 +260,7 @@ exports.updateTrainer = async (req, res) => {
     const trainer = await User.findOne({
       _id: req.params.id,
       role: "trainer",
+      isDeleted: { $ne: true },
     });
 
     if (!trainer) {
@@ -176,6 +269,10 @@ exports.updateTrainer = async (req, res) => {
         message: "Trainer not found",
       });
     }
+
+    const trainerProfile = await TrainerData.findOne({
+      trainerId: trainer._id,
+    });
 
     if (email !== undefined) {
       const normalizedEmail = email.toLowerCase().trim();
@@ -196,7 +293,49 @@ exports.updateTrainer = async (req, res) => {
     }
 
     if (name !== undefined) trainer.name = name.trim();
-    if (phone !== undefined) trainer.phone = phone;
+    if (phone !== undefined) trainer.phone = phone.trim();
+
+    if (gender !== undefined) {
+      trainer.gender = gender ? gender.toLowerCase() : "";
+    }
+
+    if (dateOfBirth !== undefined) {
+      const parsedDate = dateOfBirth ? new Date(dateOfBirth) : null;
+
+      if (parsedDate && Number.isNaN(parsedDate.getTime())) {
+        return res.status(422).json({
+          success: false,
+          message: "Invalid date of birth",
+        });
+      }
+
+      trainer.dateOfBirth = parsedDate;
+    }
+
+    if (status !== undefined) {
+      const normalizedStatus = status.toLowerCase();
+
+      if (!["active", "inactive"].includes(normalizedStatus)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid trainer status",
+        });
+      }
+
+      trainer.status = normalizedStatus;
+    }
+
+    if (password) {
+      if (password.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: "Password must be at least 6 characters",
+        });
+      }
+
+      trainer.password = password;
+    }
+
     let validatedExperience;
     if (experience !== undefined) {
       const exp = Number(experience);
@@ -211,32 +350,11 @@ exports.updateTrainer = async (req, res) => {
       validatedExperience = String(exp);
     }
 
-    if (status !== undefined) {
-      if (!["active", "inactive"].includes(status)) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid trainer status",
-        });
-      }
-
-      trainer.status = status;
-    }
-
-    if (password) {
-      if (password.length < 6) {
-        return res.status(400).json({
-          success: false,
-          message: "Password must be at least 6 characters",
-        });
-      }
-
-      trainer.password = password;
-    }
     let validatedMemberLimit;
     if (memberLimit !== undefined) {
       const limit = Number(memberLimit);
 
-      if (!Number.isInteger(limit) || limit < 1) {
+      if (!Number.isSafeInteger(limit) || limit < 1) {
         return res.status(400).json({
           success: false,
           message: "Member limit must be a positive whole number",
@@ -246,41 +364,146 @@ exports.updateTrainer = async (req, res) => {
       validatedMemberLimit = limit;
     }
 
-    await trainer.save();
+    let address;
+    if (req.body.address !== undefined) {
+      try {
+        address =
+          typeof req.body.address === "string"
+            ? JSON.parse(req.body.address)
+            : req.body.address;
+      } catch {
+        return res.status(422).json({
+          success: false,
+          message: "Invalid address data",
+        });
+      }
 
-    if (specialization !== undefined || validatedExperience !== undefined || validatedMemberLimit !== undefined) {
-      const update = {};
-      if (specialization !== undefined) update.specialization = specialization;
-      if (validatedExperience !== undefined)
-        update.experience = validatedExperience;
-      if (validatedMemberLimit !== undefined) update.memberLimit = validatedMemberLimit;
-      await TrainerData.findOneAndUpdate(
-        { trainerId: trainer._id },
-        { $set: update, $setOnInsert: { trainerId: trainer._id } },
-        { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
-      );
+      if (
+        !address ||
+        typeof address !== "object" ||
+        Array.isArray(address)
+      ) {
+        return res.status(422).json({
+          success: false,
+          message: "Invalid address data",
+        });
+      }
     }
 
-    const trainerData = trainer.toObject();
-    delete trainerData.password;
+    const oldPhotoPublicId = trainer.photoPublicId;
+
+    // Upload new photo.
+    if (req.file) {
+      uploadedPhoto = await uploadToCloudinary(req.file.buffer);
+
+      trainer.photo = uploadedPhoto.url;
+      trainer.photoPublicId = uploadedPhoto.publicId;
+    } else if (req.body.removePhoto === "true") {
+      trainer.photo = "";
+      trainer.photoPublicId = "";
+    }
+
+    // Update authentication record.
+    await trainer.save();
+
+    // Update trainer profile.
+    const profileUpdate = {};
+
+    if (specialization !== undefined) {
+      profileUpdate.specialization = specialization;
+    }
+
+    if (validatedExperience !== undefined) {
+      profileUpdate.experience = validatedExperience;
+    }
+
+    if (validatedMemberLimit !== undefined) {
+      profileUpdate.memberLimit = validatedMemberLimit;
+    }
+
+    if (address !== undefined) {
+      profileUpdate.address = address;
+    }
+
+    const savedTrainerData = await TrainerData.findOneAndUpdate(
+      { trainerId: trainer._id },
+      {
+        $set: profileUpdate,
+        $setOnInsert: { trainerId: trainer._id },
+      },
+      {
+        upsert: true,
+        returnDocument: "after",
+        setDefaultsOnInsert: true,
+        runValidators: true,
+      }
+    );
+
+    databaseUpdated = true;
+
+    // Delete old photo only after successful database update.
+    if (
+      oldPhotoPublicId &&
+      oldPhotoPublicId !== trainer.photoPublicId
+    ) {
+      await deleteFromCloudinary(oldPhotoPublicId).catch(() => {});
+    }
 
     const assignedMemberCount = await MemberData.countDocuments({
       assignedTrainer: trainer._id,
     });
-    const savedTrainerData = await TrainerData.findOne({ trainerId: trainer._id }).lean();
-    const savedMemberLimit = Number(savedTrainerData?.memberLimit ?? 20);
+
+    const savedMemberLimit = Number(
+      savedTrainerData?.memberLimit ?? 20
+    );
+
+    const trainerData = trainer.toObject();
+    delete trainerData.password;
 
     return res.status(200).json({
       success: true,
       message: "Trainer updated successfully",
       trainer: {
         ...trainerData,
+        specialization: savedTrainerData?.specialization || "",
+        experience: savedTrainerData?.experience || 0,
+        address: savedTrainerData?.address || {
+          street: "",
+          city: "",
+          country: "",
+        },
         assignedMemberCount,
         memberLimit: savedMemberLimit,
         isFull: assignedMemberCount >= savedMemberLimit,
       },
     });
   } catch (error) {
+    if (!databaseUpdated && uploadedPhoto?.publicId) {
+      await deleteFromCloudinary(uploadedPhoto.publicId).catch(() => {});
+    }
+
+    if (error.name === "ValidationError") {
+      const errors = Object.fromEntries(
+        Object.entries(error.errors).map(([field, item]) => [
+          field,
+          item.message,
+        ])
+      );
+
+      return res.status(422).json({
+        success: false,
+        message: "Validation failed",
+        errors,
+      });
+    }
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Email already exists",
+      });
+    }
+
     console.error("Update trainer error:", error);
 
     return res.status(500).json({
