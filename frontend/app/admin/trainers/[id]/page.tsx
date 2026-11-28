@@ -6,16 +6,24 @@ import AdminShell from "@/components/admin/AdminShell";
 import { getTrainerDetails } from "@/features/trainers/trainerDetailsApi";
 import type {
   TrainerRecord,
-  TrainerDetailsApiResponse,
   DetailProps,
 } from "@/types/admin/trainerDetails";
 
+
 function display(value: unknown): string {
-  if (value === null || value === undefined || value === "")
+  if (value === null || value === undefined || value === "") {
     return "Not provided";
-  if (typeof value === "boolean") return value ? "Yes" : "No";
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
 
   if (typeof value === "object") {
+    if (Array.isArray(value)) {
+      return value.length ? value.join(", ") : "Not provided";
+    }
+
     if ("name" in value && value.name) {
       return String(value.name);
     }
@@ -25,6 +33,7 @@ function display(value: unknown): string {
 
   return String(value);
 }
+
 
 function date(value: unknown): string {
   if (value === null || value === undefined || value === "") {
@@ -97,12 +106,6 @@ export default function Page() {
   return (
     <AdminShell>
       <main className="mx-auto max-w-5xl p-4 sm:p-8">
-        <button
-          onClick={() => router.push("/admin/trainers")}
-          className="mb-5 text-sm font-semibold text-[#800020] hover:underline"
-        >
-          ← Back to trainers
-        </button>
         {loading ? (
           <p className="text-gray-600">Loading trainer details…</p>
         ) : error ? (

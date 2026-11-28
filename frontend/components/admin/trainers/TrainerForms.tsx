@@ -50,34 +50,10 @@ export default function TrainerForms({
 }: TrainerFormsProps) {
   
 
-return (
-  <section className="min-h-screen bg-[#f8f6f2] px-4 py-6 text-[#292323] sm:px-6 lg:px-8">
-    <div className="mx-auto max-w-4xl">
-
-      {/* HEADER */}
-
-      <div className="mb-6 flex items-center justify-between rounded-2xl border border-gray-100 bg-white px-6 py-5">
-        <div>
-          <h2 className="text-xl font-bold text-[#302326]">
-            {editingTrainer ? "Edit Trainer" : "Add New Trainer"}
-          </h2>
-
-          <p className="mt-1 text-sm text-gray-500">
-            {editingTrainer
-              ? "Update trainer information."
-              : "Enter details to register a new trainer."}
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={closeModal}
-          className="rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-50"
-        >
-          Back to Trainers
-        </button>
-      </div>
-
+return (                            
+  <section className="min-h-screen bg-[#f8f6f2] px-4 py-1 text-[#292323] sm:px-6 lg:px-2"> 
+    <div className="mx-auto max-w-7xl">
+      
       {/* FORM */}
 
       <form
